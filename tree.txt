@@ -1,0 +1,13 @@
+will-they-wake-up/
+├── data/
+│   ├── raw/
+│   ├── processed/
+├── notebooks/
+├── model_wake_up/
+│   ├── data/
+│   ├── features/
+│   ├── models/
+│   ├── evaluation/
+├── config/
+├── tests/
+└── deployment/
