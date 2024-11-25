@@ -8,3 +8,5 @@ seaborn>=0.12.0
 flask>=2.2.0
 gunicorn>=20.0.4
 ipykernel
+plotly
+
