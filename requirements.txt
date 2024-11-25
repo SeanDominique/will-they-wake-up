@@ -1,0 +1,24 @@
+# data manipulation
+numpy>=1.22.0
+pandas>=1.5.0
+ipykernel
+jupyterlab
+
+# data visualization
+matplotlib>=3.5.0
+seaborn>=0.12.0
+plotly
+
+# models
+scikit-learn>=1.1.3
+tensorflow>=2.12.0
+
+# api
+flask>=2.2.0
+gunicorn>=20.0.4
+
+# back end
+pytest
+pylint
+ipdb
+google-cloud-bigquery>=3.10.0
