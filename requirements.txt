@@ -10,3 +10,4 @@ gunicorn>=20.0.4
 ipykernel
 plotly
 librosa
+nbformat>=4.2.0
