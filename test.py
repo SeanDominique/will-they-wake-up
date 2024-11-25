@@ -2,5 +2,5 @@ def test_func():
   print("hello")
   return
 
-if __main__ == "__name__":
+if __name__ == "__main__":
   test_func()
