@@ -15,4 +15,9 @@
   _for someting???_
 
 - __.env__
-  for environment variables which are not sensitive
+  for environment variables which are not private
+
+- __.gitignore__
+- __.python-version__
+  _for something???_
+- __requirements.txt__
