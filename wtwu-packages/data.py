@@ -24,7 +24,7 @@ def get_eeg_paths(directory):
     return sorted(eeg_files)
 
 
-def recover_eegs(patient,scaler='Standard',stop_before=0):
+def recover_eegs_and_hours(patient,scaler='Standard',stop_before=0):
 
 
     EEG_file_list = get_eeg_paths(patient)
@@ -47,12 +47,16 @@ def recover_eegs(patient,scaler='Standard',stop_before=0):
         eeg = scaler.fit_transform(eeg)
         eeg = np.mean(eeg,axis=0)
         EEG_list.append(eeg)
+    hours = pd.DataFrame(hours,columns=['hours'])
 
-    return EEG_list
+    return EEG_list,hours
 
-def get_psds(EEG_list):
+def get_psds(EEG_list,hours):
     psds = []
     for eeg in EEG_list:
         f, temp_psd = welch(eeg, fs=500, nperseg=1024)
         psds.append(temp_psd)
-    return psds
+    psds_df = pd.DataFrame(psds)
+    psds_df = pd.concat([psds_df, hours], axis=1)
+    psds_df = psds_df.groupby(by='hours',as_index=True).mean()
+    return psds_df
