@@ -28,7 +28,7 @@ def get_eeg_paths(directory):
     return sorted(eeg_files)
 
 
-def recover_eegs_and_hours(patient,scaler='Standard',stop_before=0):
+def recover_eegs_and_hours(patient,scaler='Standard'):
     '''
     This function gets extracts all EEGs from a list of file paths (patient input) and puts it in a list.
     It also gives a list of all the 'Hours after cardiac arrest' per file on a separate list.
@@ -47,9 +47,7 @@ def recover_eegs_and_hours(patient,scaler='Standard',stop_before=0):
 
     EEG_file_list = get_eeg_paths(patient)
     hours =[]
-    for file in EEG_file_list:
-        hour = file[-11:-8]
-        hours.append(hour)
+
     if scaler == 'MinMax':
         scaler = MinMaxScaler()
     if scaler == 'Standard':
@@ -58,16 +56,22 @@ def recover_eegs_and_hours(patient,scaler='Standard',stop_before=0):
         scaler = RobustScaler()
 
     EEG_list = []
-    for file_path in EEG_file_list[:-stop_before]:
+    for file_path in EEG_file_list[1:-1]:
         eeg = scipy.io.loadmat(file_path)
         eeg = eeg['val']
         eeg = eeg.astype(float)
-        for line in eeg:
-            temp_line = line.reshape(1, -1)
-            temp_line = scaler.fit_transform(temp_line)
-            line = temp_line.reshape(-1)
+        #for line in eeg:
+        #    temp_line = line.reshape(1, -1)
+        #    temp_line = scaler.fit_transform(temp_line)
+        #    line = temp_line.reshape(-1)
         # eeg = np.mean(eeg,axis=0)
         EEG_list.append(eeg)
+        EEG_list = np.array(EEG_list)
+        hour = file_path[-11:-8]
+        hours.append(hour)
+
+    hours = np.array(hours)
+    hours = np.reshape(1,-1)
 
     return EEG_list,hours
 
@@ -142,15 +146,18 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
 
         i_EEG += 1
 
+    splits = np.array(splits)
+    if len(split_time)>0:
+        split_time = np.array(split_time)
     return splits, split_time
 
 
 
 
 
-def get_psds(EEG_list,fs=100, mode='channels', hours=None):
+def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
     '''
-    This function takes a list of EEGs and returns the PSDs.
+    This function takes an array of EEGs and returns the PSDs.
     It can have two modes: 'channels' or 'time':
 
     On 'channels' mode, it will return a PSD for each channel
@@ -160,21 +167,52 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None):
     channel or an average of a single patient and return a dataframe containing
     all PSDs as columns and their 'hours after cardiac arrest' as index.
 
+    input_type = ['list' ,'array']
+
 
     '''
 
+    if hours != None:
 
-    psds = []
-    for eeg in EEG_list:
-        f, temp_psd = welch(eeg, fs=fs, nperseg=1024)
-        psds.append(temp_psd)
-    psds_df = pd.DataFrame(psds)
-    if mode == 'time':
-        psds_df = pd.concat([psds_df, hours], axis=1)
-        psds_df = psds_df.groupby(by='hours',as_index=True).mean()
-        return psds_df, f
-    elif mode == 'channels':
-        return psds, f
+
+        hours_df = pd.DataFrame(hours,columns='time')
+
+    if input_type == 'list':
+        psds = []
+        for eeg in EEG_list:
+            f, temp_psd = welch(eeg, fs=fs, nperseg=1024)
+            psds.append(temp_psd)
+        psds_df = pd.DataFrame(psds)
+        if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
+            psds_df = pd.concat([psds_df, hours_df], axis=1)
+            psds_df = psds_df.groupby(by='hours',as_index=True).mean()
+            return psds_df, f
+        elif mode == 'time':
+            return psds_df, f
+        elif mode == 'channels':
+            return psds, f
+        else:
+            print('get_psds: unrecognised mode.')
+            return None
+
+    if input_type == 'array':
+        psds_ar = np.zeros([EEG_list.shape[1],np.ceil(fs/2)])
+        for i in range(EEG_list.shape[1]):
+            f, psds_ar[i,:] = welch(psds[i,:], fs=fs, nperseg=1024)
+        psds_df = pd.DataFrame(psds_ar)
+
+        if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
+            psds_df = pd.concat([psds_df, hours_df], axis=1)
+            psds_df = psds_df.groupby(by='hours',as_index=True).mean()
+            return psds_df, f
+        elif mode == 'time':
+            return psds_df, f
+        elif mode == 'channels':
+            return psds_ar, f
+        else:
+            print('get_psds: unrecognised mode.')
+            return None
+
     else:
-        print('get_psds: unrecognised mode.')
+        print('get_psds: bad input type')
         return None
