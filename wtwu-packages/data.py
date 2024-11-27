@@ -68,7 +68,6 @@ def recover_eegs_and_hours(patient,scaler='Standard',stop_before=0):
             line = temp_line.reshape(-1)
         # eeg = np.mean(eeg,axis=0)
         EEG_list.append(eeg)
-    hours = pd.DataFrame(hours,columns=['hours'])
 
     return EEG_list,hours
 
@@ -110,6 +109,42 @@ def reduce_EEGs(list_of_EEGs, rate_of_reduction = 5, original_freq = 500):
         EEG = single_reduction(EEG)
         new_list_of_EEGs.append(EEG)
     return new_list_of_EEGs
+
+def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=None):
+    '''
+    This function takes a list of EEGs, their frequency, the sampling rate in seconds
+    (every 10 min = 600), the sampling size in seconds, and if available, the list of
+    hours after cardiac arrest.
+
+    It returns splits of the EEGs every (sampling_rate) seconds of length (sampling_size)
+    seconds. If a list of hours was given, it also returns a list of decimal times in hours.
+    This list can later be transformed in HH:MM easily, if needed.
+
+    '''
+
+
+    splits = []
+    split_time = []
+    i_EEG = 0
+
+    for EEG in list_of_EEGs:
+
+        i = 0
+        while ((sampling_rate*i) + sampling_size)*fs < len(EEG):
+
+            splits.append(EEG[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
+
+            if hours != None:
+
+                split_time.append(float(hours[i_EEG])+((fs/sampling_rate)*i))
+
+            i += 1
+
+        i_EEG += 1
+
+    return splits, split_time
+
+
 
 
 
