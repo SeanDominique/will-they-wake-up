@@ -137,9 +137,9 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None):
     if mode == 'time':
         psds_df = pd.concat([psds_df, hours], axis=1)
         psds_df = psds_df.groupby(by='hours',as_index=True).mean()
-        return psds_df
+        return psds_df, f
     elif mode == 'channels':
-        return psds
+        return psds, f
     else:
         print('get_psds: unrecognised mode.')
         return None
