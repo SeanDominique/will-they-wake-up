@@ -2,6 +2,8 @@ raw_data/
 data/
 .vscode
 .env
+.envrc
+.secrets/
 .old
 test/
 notesbooks/
