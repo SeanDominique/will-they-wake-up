@@ -140,6 +140,8 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
 
             i += 1
 
+        i_EEG += 1
+
     return splits, split_time
 
 
