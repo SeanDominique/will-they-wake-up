@@ -8,12 +8,12 @@
 
 
 ######## IMPORTS #######
+=======
 import os
 from wtwu.params import *
 
 from google.cloud import storage
 from concurrent.futures import ThreadPoolExecutor
-
 from scipy.io import loadmat
 import numpy as np
 import pandas as pd
@@ -22,7 +22,6 @@ import io
 # # to automate with model lifecycle
 # import mlflow
 # import pickle
-
 
 ######## CONSTANTS ########
 CHANNELS = ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3", "P4"] # channels we are interested in
@@ -141,6 +140,7 @@ def import_data(patient_id: str):
             ######
 
 
+
             ### debugging
             # temp = "gs://data-wtwa/i-care-2.0.physionet.org/training/0284/0284.txt"
             # temp = "i-care-2.0.physionet.org/training/0284/0284.txt"
@@ -154,6 +154,7 @@ def import_data(patient_id: str):
 
 
     elif DATA_TARGET == "local":
+
         print("importing data from local...")
         # TODO: (low prio) logic to import from local machine
         pass
@@ -275,6 +276,7 @@ if __name__ == "__main__":
     print(survived)
     print(eeg_data_headers)
     print(all_eeg_data)
+
 
 
 # def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None:
