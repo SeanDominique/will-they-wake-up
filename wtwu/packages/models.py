@@ -114,3 +114,18 @@ def evaluate_model(model, X_test, y_test, batch_size=8):
     results = {metric: value for metric, value in zip(metrics_names, evaluation)}
 
     return results
+
+
+def model_predict():
+    # get new data
+    # from storage import *
+
+    # clean, preprocess the data
+    # from preprocess import *
+
+    # TODO: actually make the prediction
+
+    # save the scores of the model in GCS
+    # from model import *
+
+    pass

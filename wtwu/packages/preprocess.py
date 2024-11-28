@@ -6,6 +6,45 @@ import os
 from scipy.signal import welch
 
 
+def clean_data():
+    # TODO: make sure column names are
+
+    # make sure everything is in the right shape
+
+    # deal with different frequencies based on hospitals
+
+    # get the right channels
+
+    pass
+
+
+
+####################### PREPROCESS #################
+def standardize():
+    pass
+
+def impute():
+    pass
+
+def remove_channels():
+    pass
+
+def padding():
+    pass
+
+def remove_outliers():
+
+    # bandpass filter
+
+    # notch filter
+
+    # remove artefacts
+
+    pass
+
+
+####################### ECHANTILLONAGE #######################
+
 
 file_path = '/home/mariorocha/code/SeanDominique/will-they-wake-up/data/raw/physionet.org/files/i-care/2.1/training/0284/'
 ##TODO Change the path using os, if possible making the patient a variable.
@@ -216,3 +255,16 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
     else:
         print('get_psds: bad input type')
         return None
+
+
+
+####################### PREPROCESSING #######################
+
+def preprocess():
+    pass
+
+
+
+
+def imputation():
+    pass
