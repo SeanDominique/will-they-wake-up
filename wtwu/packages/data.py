@@ -10,6 +10,26 @@ from scipy.signal import welch
 file_path = '/home/mariorocha/code/SeanDominique/will-they-wake-up/data/raw/physionet.org/files/i-care/2.1/training/0284/'
 ##TODO Change the path using os, if possible making the patient a variable.
 
+def check_outcome(file_path):
+    """
+    Reads a file and returns 1 if the Outcome is 'Good', otherwise 0.
+
+    Args:
+        file_path (str): Path to the file containing patient data.
+
+    Returns:
+        int: 1 if Outcome is 'Good', 0 otherwise.
+    """
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        for line in lines:
+            if line.startswith("Outcome:"):
+                outcome = line.split(":")[1].strip()
+                return 1 if outcome == "Good" else 0
+    # Return 0 if 'Outcome' line is missing
+    return 0
+
+
 def parse_eeg_file(file_path):
 
     '''get info from EEG.hea files.'''
@@ -74,7 +94,7 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
     There's a commented line if we want to do the mean of all channels.
 
     '''
-
+    outcome = check_outcome(patient+patient[-3:-1]+'.txt')
     EEG_file_list = get_eeg_paths(patient)
     hours =[]
 
@@ -93,10 +113,10 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
 
         eeg = scipy.io.loadmat(file_path)
         header = parse_eeg_file(file_path[:-3]+'hea')
-
-        #    temp_line = line.reshape(1, -1)
-        #    temp_line = scaler.fit_transform(temp_line)
-        #    line = temp_line.reshape(-1)
+        # for line in eeg:
+        #     temp_line = line.reshape(1, -1)
+        #     temp_line = scaler.fit_transform(temp_line)
+        #     line = temp_line.reshape(-1)
         # eeg = np.mean(eeg,axis=0)
 
         if header["first_line_numbers"][2]/header["first_line_numbers"][1] == 3600:
@@ -109,6 +129,10 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
                    eeg['val'][header["matching_lines"]["P3"]-2],
                    eeg['val'][header["matching_lines"]["P4"]-2],
                    ]
+            for line in eeg:
+                temp_line = line.reshape(1,-1)
+                temp_line = scaler.fit_transform(temp_line)
+                line = temp_line.reshape(-1)
             eeg = np.array(eeg)
             eeg = eeg.astype(float)
 
@@ -119,13 +143,13 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
             print(hour)
             hours.append(hour)
 
-
+    freq = headers_list[0]["first_line_numbers"][1]
 
     EEG_list = np.array(EEG_list)
     hours = np.array(hours)
     hours = hours.reshape(1,-1)
 
-    return EEG_list,hours, headers_list[0]
+    return EEG_list,outcome, freq,hours
 
 def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
     '''
@@ -240,8 +264,8 @@ def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=
         list_of_split_times.append(split_time)
 
     list_of_splits = np.array(list_of_splits)
-    list_of_splits = list_of_splits.reshape(int(list_of_splits.shape[0]),int(list_of_splits.shape[1]/8),8,int(list_of_splits.shape[2]))
-    list_of_splits = np.transpose(list_of_splits,axes=(0,1,3,2))
+    list_of_splits = list_of_splits.reshape(int(list_of_splits.shape[0]),8,int(list_of_splits.shape[1]/8),int(list_of_splits.shape[2]))
+    list_of_splits = np.transpose(list_of_splits,axes=(0,2,3,1))
     if len(list_of_split_times)>0:
         list_of_split_times = np.array(list_of_split_times)
 
