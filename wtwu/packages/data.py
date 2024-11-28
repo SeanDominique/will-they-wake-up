@@ -94,7 +94,7 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
     There's a commented line if we want to do the mean of all channels.
 
     '''
-    outcome = check_outcome(patient+patient[-3:-1]+'.txt')
+    outcome = check_outcome(patient+patient[-5:-1]+'.txt')
     EEG_file_list = get_eeg_paths(patient)
     hours =[]
 
@@ -139,17 +139,17 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
             headers_list.append(header)
 
             EEG_list.append(eeg)
-            hour = float(file_path[-11:-8])
+            hour = (file_path[-11:-8])
             print(hour)
             hours.append(hour)
 
     freq = headers_list[0]["first_line_numbers"][1]
 
     EEG_list = np.array(EEG_list)
-    hours = np.array(hours)
-    hours = hours.reshape(1,-1)
+    hours = np.array(hours).astype(np.float16)
 
-    return EEG_list,outcome, freq,hours
+
+    return EEG_list, outcome, freq, hours
 
 def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
     '''
@@ -162,8 +162,6 @@ def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
 
     #rate_of_reduction = np.round(rate_of_reduction)
 
-
-    import numpy as np
 
     def resample_time_series_array(time_series, original_freq, target_freq):
         """
@@ -242,8 +240,8 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
             splits.append(EEG[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
 
             if hours != None:
-
-                split_time.append(float(hours[i_EEG])+((fs/sampling_rate)*i))
+                print((hours[i_EEG])+((fs/sampling_rate)*i))
+                split_time.append((hours[i_EEG])+((fs/sampling_rate)*i))
 
             i += 1
 
@@ -252,6 +250,7 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
     splits = np.array(splits)
     if len(split_time)>0:
         split_time = np.array(split_time)
+
     return splits, split_time
 
 def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=None):
@@ -259,7 +258,7 @@ def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=
     list_of_splits = []
     list_of_split_times = []
     for i in range(0,reduced_array.shape[0]):
-        split, split_time = sampling_EEGs(reduced_array[i,:,:])
+        split, split_time = sampling_EEGs(reduced_array[i,:,:],hours=hours)
         list_of_splits.append(split)
         list_of_split_times.append(split_time)
 
