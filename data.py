@@ -94,7 +94,7 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
     There's a commented line if we want to do the mean of all channels.
 
     '''
-    outcome = check_outcome(patient+patient[-5:-1]+'.txt')
+    outcome = check_outcome(patient+patient[-3:-1]+'.txt')
     EEG_file_list = get_eeg_paths(patient)
     hours =[]
 
@@ -139,17 +139,17 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
             headers_list.append(header)
 
             EEG_list.append(eeg)
-            hour = (file_path[-11:-8])
+            hour = float(file_path[-11:-8])
             print(hour)
             hours.append(hour)
 
     freq = headers_list[0]["first_line_numbers"][1]
 
     EEG_list = np.array(EEG_list)
-    hours = np.array(hours).astype(np.float16)
+    hours = np.array(hours)
+    hours = hours.reshape(1,-1)
 
-
-    return EEG_list, outcome, freq, hours
+    return EEG_list,outcome, freq,hours
 
 def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
     '''
@@ -162,6 +162,8 @@ def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
 
     #rate_of_reduction = np.round(rate_of_reduction)
 
+
+    import numpy as np
 
     def resample_time_series_array(time_series, original_freq, target_freq):
         """
@@ -239,23 +241,17 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
 
             splits.append(EEG[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
 
-            if hours.shape != None:
+            if hours != None:
 
-
-                if i_EEG < len(hours):
-                    split_time.append((hours[i_EEG])+((fs/sampling_rate)*i))
+                split_time.append(float(hours[i_EEG])+((fs/sampling_rate)*i))
 
             i += 1
 
         i_EEG += 1
 
-
-
-
     splits = np.array(splits)
     if len(split_time)>0:
         split_time = np.array(split_time)
-
     return splits, split_time
 
 def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=None):
@@ -263,17 +259,15 @@ def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=
     list_of_splits = []
     list_of_split_times = []
     for i in range(0,reduced_array.shape[0]):
-        split, split_time = sampling_EEGs(reduced_array[i,:,:],hours=hours)
+        split, split_time = sampling_EEGs(reduced_array[i,:,:])
         list_of_splits.append(split)
         list_of_split_times.append(split_time)
 
     list_of_splits = np.array(list_of_splits)
     list_of_splits = list_of_splits.reshape(int(list_of_splits.shape[0]),8,int(list_of_splits.shape[1]/8),int(list_of_splits.shape[2]))
     list_of_splits = np.transpose(list_of_splits,axes=(0,2,3,1))
-    list_of_splits = list_of_splits.reshape(list_of_splits.shape[0]*list_of_splits.shape[1],list_of_splits.shape[2],list_of_splits.shape[3])
     if len(list_of_split_times)>0:
         list_of_split_times = np.array(list_of_split_times)
-        list_of_split_times = list_of_split_times[0,:]
 
     return list_of_splits, list_of_split_times
 
@@ -320,27 +314,19 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='array'):
             return None
 
     if input_type == 'array':
-        psds = []
-        for i in range(0, EEG_list.shape[0]):
-            psds1 = []
-            for j in range(0, EEG_list.shape[2]):
-                f, psds_temp = welch(EEG_list[i,:,j], fs=fs, nperseg=4*fs)
-                psds1.append(psds_temp)
-            psds.append(psds1)
-        psds_ar = np.array(psds)
-        psds_ar = np.transpose(psds_ar, axes=(0,2,1))
+        psds_ar = np.zeros((EEG_list.shape[1],int(fs/2)))
+        for i in range(EEG_list.shape[1]):
+            f, psds_ar[i,:] = welch(EEG_list[i,:], fs=fs, nperseg=1024)
+        psds_df = pd.DataFrame(psds_ar)
 
-
-
-        if mode == 'time':
-            psds_df = pd.DataFrame(psds_ar)
-            if hours.shape[0] == psds_ar.shape[1]:
-                psds_df = pd.concat([psds_df, hours_df], axis=1)
-                psds_df = psds_df.groupby(by='hours',as_index=True).mean()
-                return f, psds_df
-            return f, psds_df
+        if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
+            psds_df = pd.concat([psds_df, hours_df], axis=1)
+            psds_df = psds_df.groupby(by='hours',as_index=True).mean()
+            return psds_df, f
+        elif mode == 'time':
+            return psds_df, f
         elif mode == 'channels':
-            return f, psds_ar
+            return psds_ar, f
         else:
             print('get_psds: unrecognised mode.')
             return None
