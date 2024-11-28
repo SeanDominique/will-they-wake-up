@@ -274,8 +274,8 @@ def save_results_to_gcs():
 if __name__ == "__main__":
     survived, eeg_data_headers, all_eeg_data = import_data("0430")
     print(survived)
-    print(eeg_data_headers)
-    print(all_eeg_data)
+    print(len(eeg_data_headers))
+    print(all_eeg_data.shape)
 
 
 

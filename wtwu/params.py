@@ -12,6 +12,7 @@ PROJECT_ID = os.environ.get("PROJECT_ID")
 GCP_REGION = os.environ.get("GCP_REGION")
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME")
+DATA_TARGET = os.environ.get("DATA_TARGET")
 MODEL_TARGET = os.environ.get("MODEL_TARGET")
 PATIENT_DATA_PATH = os.environ.get("PATIENT_DATA_PATH")
 
