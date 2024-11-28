@@ -126,6 +126,6 @@ def model_predict():
     # TODO: actually make the prediction
 
     # save the scores of the model in GCS
-    # from model import *
+    # from storage import *
 
     pass

@@ -19,30 +19,6 @@ def clean_data():
 
 
 
-####################### PREPROCESS #################
-def standardize():
-    pass
-
-def impute():
-    pass
-
-def remove_channels():
-    pass
-
-def padding():
-    pass
-
-def remove_outliers():
-
-    # bandpass filter
-
-    # notch filter
-
-    # remove artefacts
-
-    pass
-
-
 ####################### ECHANTILLONAGE #######################
 
 
@@ -267,4 +243,28 @@ def preprocess():
 
 
 def imputation():
+    pass
+
+
+####################### PREPROCESS #################
+def standardize():
+    pass
+
+def impute():
+    pass
+
+def remove_channels():
+    pass
+
+def padding():
+    pass
+
+def remove_outliers():
+
+    # bandpass filter
+
+    # notch filter
+
+    # remove artefacts
+
     pass
