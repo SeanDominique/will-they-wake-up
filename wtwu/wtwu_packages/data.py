@@ -9,6 +9,36 @@ from scipy.signal import welch
 
 file_path = '/home/mariorocha/code/SeanDominique/will-they-wake-up/data/raw/physionet.org/files/i-care/2.1/training/0284/'
 ##TODO Change the path using os, if possible making the patient a variable.
+
+def parse_eeg_file(file_path):
+
+    '''get info from EEG.hea files.'''
+    result = {
+        "first_line_numbers": [],
+        "matching_lines": {}
+    }
+
+    search_strings = ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3", "P4"]
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+        # Process the first line
+        first_line_parts = lines[0].strip().split()
+        result["first_line_numbers"] = list(map(int, first_line_parts[-3:]))
+
+        # Search for specific strings in subsequent lines
+        for search_string in search_strings:
+            for line_index, line in enumerate(lines[1:], start=2):  # Start from 2 since the first line is processed
+                if search_string in line:
+                    result["matching_lines"][search_string] = line_index
+                    break  # Stop searching after the first match
+
+    return result
+
+
+
+
 def get_eeg_paths(directory):
     '''
     This function gets all the EEG file paths from a directory input, sorted over time.
@@ -56,18 +86,34 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
         scaler = RobustScaler()
 
     EEG_list = []
+    headers_list = []
+
+
     for file_path in EEG_file_list[1:-1]:
 
         eeg = scipy.io.loadmat(file_path)
-
-        eeg = eeg['val']
-        eeg = eeg.astype(float)
+        header = parse_eeg_file(file_path[:-3]+'hea')
 
         #    temp_line = line.reshape(1, -1)
         #    temp_line = scaler.fit_transform(temp_line)
         #    line = temp_line.reshape(-1)
         # eeg = np.mean(eeg,axis=0)
-        if eeg.shape == (20, 7372800):
+
+        if header["first_line_numbers"][2]/header["first_line_numbers"][1] == 3600:
+            eeg = [eeg['val'][header["matching_lines"]["Fp1"]-2],
+                   eeg['val'][header["matching_lines"]["Fp2"]-2],
+                   eeg['val'][header["matching_lines"]["F3"]-2],
+                   eeg['val'][header["matching_lines"]["F4"]-2],
+                   eeg['val'][header["matching_lines"]["C3"]-2],
+                   eeg['val'][header["matching_lines"]["C4"]-2],
+                   eeg['val'][header["matching_lines"]["P3"]-2],
+                   eeg['val'][header["matching_lines"]["P4"]-2],
+                   ]
+            eeg = np.array(eeg)
+            eeg = eeg.astype(float)
+
+            headers_list.append(header)
+
             EEG_list.append(eeg)
             hour = float(file_path[-11:-8])
             print(hour)
@@ -79,46 +125,73 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
     hours = np.array(hours)
     hours = hours.reshape(1,-1)
 
-    return EEG_list,hours
+    return EEG_list,hours, headers_list[0]
 
-def reduce_EEGs(list_of_EEGs, rate_of_reduction = 5, original_freq = 500):
+def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
     '''
-    This function takes a list of EEG spectra, the rate_of_reduction of the frequency
-    and the original_frequency, the last two defaulted at 5 and 500.
+    This function takes a list of EEG spectra, the target frequency
+    and the original_frequency, the last two defaulted at 100 and 500.
 
-    That means that an EEG with an original frequency of 500 Hz if passed through
-    with rate_of_reduction = 5, will return an EEG of frequency 500/5, that is, 100 Hz.
-
-    The rate_of_reduction variable will be rounded before any calculations to avoid problems
-    trying to create arrays of non-integer sizes.
 
     '''
 
 
-    rate_of_reduction = np.round(rate_of_reduction)
+    #rate_of_reduction = np.round(rate_of_reduction)
 
 
-    def single_reduction(EEG):
-            if len(EEG) % rate_of_reduction == 0:
+    import numpy as np
 
-                print(f'EEG reduced to a {original_freq/rate_of_reduction} Hz frequence.')
-                return EEG.reshape(-1, int(rate_of_reduction) ).mean(axis=1)
+    def resample_time_series_array(time_series, original_freq, target_freq):
+        """
+        Resample a time series to a target frequency, even if it's not a divisor of the original frequency.
 
-            else:
-                print('Data will be cut due to undivisible length.')
+        Args:
+            time_series (np.ndarray): Original time series as a 1D numpy array.
+            original_freq (float): Original frequency in Hz.
+            target_freq (float): Target frequency in Hz.
 
-                remaining = int(len(EEG) % rate_of_reduction)
-                print(f'Points lost: {remaining}')
+        Returns:
+            np.ndarray: Resampled time series.
+            np.ndarray: New time points corresponding to the resampled series.
+        """
+        # Original time points
+        original_time_points = np.arange(len(time_series)) / original_freq
 
-                EEG = EEG[:-remaining]
-                print(f'EEG reduced to a {original_freq/rate_of_reduction} Hz frequence.')
+        # Target time points
+        duration = original_time_points[-1]  # Total duration in seconds
+        target_time_points = np.arange(0, duration, 1 / target_freq)
 
-                return EEG.reshape(-1, int(rate_of_reduction) ).mean(axis=1)
+        # Interpolation
+        interpolated_values = np.interp(
+            target_time_points,
+            original_time_points,
+            time_series
+        )
+
+        return interpolated_values, target_time_points
+
+
+
+
+
     new_list_of_EEGs = []
     for EEG in list_of_EEGs:
-        EEG = single_reduction(EEG)
+        EEG , times = resample_time_series_array(EEG,original_freq,target_freq)
         new_list_of_EEGs.append(EEG)
+    new_list_of_EEGs = np.array(new_list_of_EEGs)
     return new_list_of_EEGs
+
+def reduce_all_channels(channels_array, target_freq = 100, original_freq =500):
+    #rate_of_reduction = np.round(rate_of_reduction)
+
+    reduced_channels = []
+    for i in range(0,channels_array.shape[0]):
+        reduced_channels.append(reduce_EEGs(channels_array[i,:,:],
+                                              target_freq= target_freq,
+                                              original_freq=original_freq
+                                              ))
+    reduced_channels = np.array(reduced_channels)
+    return reduced_channels
 
 def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=None):
     '''
@@ -157,13 +230,27 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
         split_time = np.array(split_time)
     return splits, split_time
 
+def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=None):
+    '''Does the sampling in all channels and all times'''
+    list_of_splits = []
+    list_of_split_times = []
+    for i in range(0,reduced_array.shape[0]):
+        split, split_time = sampling_EEGs(reduced_array[i,:,:])
+        list_of_splits.append(split)
+        list_of_split_times.append(split_time)
+
+    list_of_splits = np.array(list_of_splits)
+
+    if len(list_of_split_times)>0:
+        list_of_split_times = np.array(list_of_split_times)
+
+    return list_of_splits, list_of_split_times
 
 
 
-
-def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
+def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='array'):
     '''
-    This function takes an array of EEGs and returns the PSDs.
+    This function takes an array or list of EEGs and returns the PSDs.
     It can have two modes: 'channels' or 'time':
 
     On 'channels' mode, it will return a PSD for each channel
@@ -202,9 +289,9 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
             return None
 
     if input_type == 'array':
-        psds_ar = np.zeros([EEG_list.shape[1],np.ceil(fs/2)])
+        psds_ar = np.zeros((EEG_list.shape[1],int(fs/2)))
         for i in range(EEG_list.shape[1]):
-            f, psds_ar[i,:] = welch(psds[i,:], fs=fs, nperseg=1024)
+            f, psds_ar[i,:] = welch(EEG_list[i,:], fs=fs, nperseg=1024)
         psds_df = pd.DataFrame(psds_ar)
 
         if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
