@@ -240,7 +240,8 @@ def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=
         list_of_split_times.append(split_time)
 
     list_of_splits = np.array(list_of_splits)
-
+    list_of_splits = list_of_splits.reshape(int(list_of_splits.shape[0]),int(list_of_splits.shape[1]/8),8,int(list_of_splits.shape[2]))
+    list_of_splits = np.transpose(list_of_splits,axes=(0,1,3,2))
     if len(list_of_split_times)>0:
         list_of_split_times = np.array(list_of_split_times)
 
