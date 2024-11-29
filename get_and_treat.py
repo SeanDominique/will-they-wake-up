@@ -61,6 +61,7 @@ if not os.path.exists(f'./data/processed/{patient}/times.npy'):
         with open(f'./data/processed/{patient}/psds_fs.npy', 'wb') as f:
             np.save(f, psds_fs)
 
+
         # time_splits.npy contains arrays of 3 dimensions (X, Y, Z)
         # X = number of 15s segments collected from the patients EEG TS
         # Y = 1500 ( = 15s * 100 Hz)
