@@ -52,14 +52,17 @@ def import_data(patient_id: str):
             # TODO: Threading to download blobs in parallel
 
             client = storage.Client()
+            print(client.project)
+            print(BUCKET_NAME)
             bucket = client.bucket(BUCKET_NAME)
-
+            print(bucket.name)
             gcs_wtwu_blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_DATA_PATH}{patient_id}/", delimiter='/')
 
             # # only collect the first header for a given patient
             # no_header = True
             eeg_data_headers = []
             all_eeg_data = []
+            survived = None
 
             for blob in gcs_wtwu_blobs:
                 # Download in memory to reduce I/O operations
@@ -148,8 +151,9 @@ def import_data(patient_id: str):
             # https://storage.googleapis.com/download/storage/v1/b/data-wtwa/o/gs%3A%2F%2Fdata-wtwa%2Fi-care-2.0.physionet.org%2Ftraining%2F0284%2F0284.txt?alt=media
             ###
 
-        except:
-            print("Couldn't download from GCS")
+        except Exception as e :
+
+            print("Couldn't download from GCS", e)
             return "Error", "Error", "Error"
 
 
