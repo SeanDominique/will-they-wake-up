@@ -3,85 +3,121 @@ import wtwu.packages.data as wtdata
 import os
 import numpy as np
 import pickle
-import sys
-
-#list_of_patients = ([name for name in os.listdir(training_folder) if name.isnumeric()])
-patient = sys.argv[1] # input string or int in CLI, assumes 0 at the start of the patient number if < 1000
-#for patient in list_of_patients:
-if not os.path.exists(f'./data/processed/{patient}/times.npy'):
-
-    survived, eeg_data_headers, all_eeg_data = wtstorage.import_data(patient)
-
-    # in case no relevant data is found from import_data
-    if eeg_data_headers != 'Error' and len(eeg_data_headers)>0:
-
-        fs = eeg_data_headers[0]['fs']
-
-        # get all initial recording times for each file analysed.
-        hours = []
-        for header in eeg_data_headers:
-            hours.append(header['recording_hour'])
-        hours = np.array(hours).astype(np.float16)
-
-        print(hours)
-        if not os.path.exists(f'./data/processed/{patient}'):
-            os.makedirs(f'./data/processed/{patient}')
-
-        # .txt file containing True/False based on if this patient survived
-        with open(f'./data/processed/{patient}/y.txt', 'a+') as f:
-
-            f.write(f'survived:{survived}\n')
-
-        # undersamples to 100Hz
-        reduced_eeg_data = wtdata.reduce_all_channels(all_eeg_data,
-                                            target_freq= 100,
-                                            original_freq=fs
-                                            )
+from google.cloud import storage
 
 
+# Paramètres du bucket
+bucket_name = "data-wtwa"
+preprocessed_path = "preprocessed/"  # Dossier cible dans le bucket Google Cloud
+local_processed_path = "./data/processed"  # Dossier temporaire local
 
-        # splits TS into 15 second windows every 10 minutes
-        list_of_splits, list_of_times = wtdata.sample_all(reduced_eeg_data,hours=hours)
-        std = np.std(list_of_splits,axis=0)
-        mean = np.mean(list_of_splits, axis=0)
-        std = np.where(std == 0, 1, std)
-        for i in range(0,list_of_splits.shape[0]):
-            list_of_splits[i,:,:] = (list_of_splits[i,:,:] - mean ) / std
+# Initialisation du client Google Cloud Storage
+client = storage.Client()
 
-        # creates PSDs of these 15s windows
-        psds_fs, list_of_psds = wtdata.get_psds(list_of_splits)
+def get_list_of_patients(bucket_name, training_path):
+    """
+    Récupère la liste des patients à partir des blobs présents dans le bucket Google Storage.
+    """
+    bucket = client.bucket(bucket_name)
+    blobs = bucket.list_blobs(prefix=training_path)
 
+    # Extraire les ID des patients
+    patient_ids = set()
+    for blob in blobs:
+        path_parts = blob.name.split("/")
+        if len(path_parts) > 2 and path_parts[-2].isnumeric():
+            patient_ids.add(path_parts[-2])
 
-        # .npy file containing PSDs for each observation of this patient
-        # number of psds = number of >1h long EEG recordings * 6 (for each 10 minute segment)
-        with open(f'./data/processed/{patient}/psds.npy', 'wb') as f:
-            np.save(f, list_of_psds)
+    return sorted(list(patient_ids))
 
-        # psds_fs.psds contains the x-axis for the PSDs
-        with open(f'./data/processed/{patient}/psds_fs.npy', 'wb') as f:
-            np.save(f, psds_fs)
+def preprocess_patient(patient, local_path):
+    """
+    Prétraite les données d'un patient et sauvegarde les fichiers localement.
+    """
+    patient_local_path = os.path.join(local_path, str(patient))
+    if not os.path.exists(f'{patient_local_path}/times.npy'):
 
+        # Import des données
+        survived, eeg_data_headers, all_eeg_data = wtstorage.import_data(patient)
 
-        # time_splits.npy contains arrays of 3 dimensions (X, Y, Z)
-        # X = number of 15s segments collected from the patients EEG TS
-        # Y = 1500 ( = 15s * 100 Hz)
-        # Z = number of channels (ie. 8)
-        with open(f'./data/processed/{patient}/time_splits.npy', 'wb') as f:
-            np.save(f, list_of_splits)
+        if eeg_data_headers != 'Error' and len(eeg_data_headers) > 0:
+            fs = eeg_data_headers[0]['fs']
+            hours = np.array([header['recording_hour'] for header in eeg_data_headers]).astype(np.float16)
 
-        # headers.pkl contains a list with all the headers for each array in time_splits.npy
-        with open(f'./data/processed/{patient}/headers.pkl', 'wb') as f:
-            pickle.dump(eeg_data_headers, f)
+            # Création du dossier local pour le patient
+            os.makedirs(patient_local_path, exist_ok=True)
 
-        # times.npy has all timestamps for each observation in time_splits.npy
-        with open(f'./data/processed/{patient}/times.npy', 'wb') as f:
-            np.save(f, list_of_times)
+            # Écriture des métadonnées
+            with open(f'{patient_local_path}/y.txt', 'a+') as f:
+                f.write(f'survived:{survived}\n')
 
-        print(patient, ' done!')
+            # Réduction des données
+            reduced_eeg_data = wtdata.reduce_all_channels(all_eeg_data, target_freq=100, original_freq=fs)
+
+            # Fenêtrage et normalisation
+            list_of_splits, list_of_times = wtdata.sample_all(reduced_eeg_data, hours=hours)
+            std = np.std(list_of_splits, axis=0)
+            mean = np.mean(list_of_splits, axis=0)
+            std = np.where(std == 0, 1, std)
+            list_of_splits = (list_of_splits - mean) / std
+
+            # Calcul des PSD
+            psds_fs, list_of_psds = wtdata.get_psds(list_of_splits)
+
+            # Sauvegarde des fichiers localement
+            np.save(f'{patient_local_path}/psds.npy', list_of_psds)
+            np.save(f'{patient_local_path}/psds_fs.npy', psds_fs)
+            np.save(f'{patient_local_path}/time_splits.npy', list_of_splits)
+            pickle.dump(eeg_data_headers, open(f'{patient_local_path}/headers.pkl', 'wb'))
+            np.save(f'{patient_local_path}/times.npy', list_of_times)
+
+            print(f"Patient {patient} : Prétraitement terminé!")
+            return patient_local_path
+        else:
+            print(f"Patient {patient} : Données introuvables ou incorrectes.")
     else:
-        print(patient, ' skipped!')
-    del survived
-    del eeg_data_headers
-    del all_eeg_data
-else:
-    print(patient, ' already present!')
+        print(f"Patient {patient} : Données déjà prétraitées.")
+    return None
+
+def upload_preprocessed_to_gcp(patient_local_path, bucket_name, preprocessed_path, patient_id):
+    """
+    Upload les fichiers prétraités pour un patient vers le bucket GCP.
+    """
+    bucket = client.bucket(bucket_name)
+    remote_path = f"{preprocessed_path}{patient_id}/"
+
+    for file_name in os.listdir(patient_local_path):
+        local_file_path = os.path.join(patient_local_path, file_name)
+        blob_path = f"{remote_path}{file_name}"
+        blob = bucket.blob(blob_path)
+        blob.upload_from_filename(local_file_path)
+        print(f"Fichier {file_name} uploadé vers {blob_path}")
+
+def delete_local_files(patient_local_path):
+    """
+    Supprime les fichiers locaux d'un patient après leur upload.
+    """
+    if os.path.exists(patient_local_path):
+        for file_name in os.listdir(patient_local_path):
+            file_path = os.path.join(patient_local_path, file_name)
+            os.remove(file_path)  # Supprimer chaque fichier
+        os.rmdir(patient_local_path)  # Supprimer le dossier une fois vide
+        print(f"Fichiers locaux pour le patient supprimés : {patient_local_path}")
+
+def preprocess_and_upload(bucket_name, training_path, local_processed_path, preprocessed_path):
+    """
+    Prétraite les données de tous les patients, les upload vers le bucket Google Cloud,
+    puis supprime les fichiers locaux.
+    """
+    patients = get_list_of_patients(bucket_name, training_path)
+    print(f"Patients détectés : {patients}")
+
+    for patient in patients:
+        print(f"Traitement du patient {patient}...")
+        patient_local_path = preprocess_patient(patient, local_processed_path)
+        if patient_local_path:
+            upload_preprocessed_to_gcp(patient_local_path, bucket_name, preprocessed_path, patient)
+            delete_local_files(patient_local_path)
+
+# Lancer le processus
+preprocess_and_upload(bucket_name, "i-care-2.0.physionet.org/training/", local_processed_path, preprocessed_path)
