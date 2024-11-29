@@ -1,5 +1,3 @@
-
-
 from wtwu.storage import *
 
 from wtwu.packages.preprocess import *
@@ -23,10 +21,7 @@ def preprocess():
 
 def train(input_shape, model, ):
     # model
-
-
-    create_model():
-
+    create_model()
 
     pass
 
