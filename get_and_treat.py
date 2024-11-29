@@ -6,15 +6,15 @@ import pickle
 
 
 training_folder = "/home/mario/code/SeanDominique/will-they-wake-up/data/physionet.org/files/i-care/2.1/training"
-list_of_patients = ['0931', '0826', '0693']
-#list_of_patients = ([name for name in os.listdir(training_folder) if name.isnumeric()])
+#list_of_patients = ['0931', '0826', '0693']
+list_of_patients = ([name for name in os.listdir(training_folder) if name.isnumeric()])
 
 for patient in list_of_patients:
     survived, eeg_data_headers, all_eeg_data = wtstorage.import_data(patient)
 
     fs = eeg_data_headers[0]['fs']
     if not os.path.exists(f'./data/processed/{patient}'):
-        os.makedirs(f'./{patient}')
+        os.makedirs(f'./data/processed/{patient}')
     with open(f'./data/processed/{patient}/y.txt', 'a+') as f:
 
         f.write(f'survived:{survived}\n')
