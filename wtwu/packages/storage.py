@@ -38,10 +38,14 @@ def import_data(patient_id: str):
         eeg_data_headers : list() --> contains dictionaries with EEG data array info
         all_eeg_data : np.array --> patient EEG data
     """
-
+    survived = 0
+    eeg_data_headers = []
+    all_eeg_data = []
     # TODO: Start / connect to VM
 
-
+    client = storage.Client()
+    bucket = client.bucket(BUCKET_NAME)
+    print("print Bucket :", bucket)
     # import patient data
     if DATA_TARGET == "gcs":
 
@@ -52,6 +56,7 @@ def import_data(patient_id: str):
 
             client = storage.Client()
             bucket = client.bucket(BUCKET_NAME)
+            print(bucket)
 
             gcs_wtwu_blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_DATA_PATH}{patient_id}/", delimiter='/')
 

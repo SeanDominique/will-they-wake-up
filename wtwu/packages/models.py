@@ -129,3 +129,5 @@ def model_predict():
     # from model import *
 
     pass
+s
+create_model(dense_units=32, dropout_rate=0.3)
