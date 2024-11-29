@@ -55,8 +55,9 @@ def import_data(patient_id: str):
             # TODO: Threading to download blobs in parallel
 
             client = storage.Client()
+            print(client.project)
+            print(BUCKET_NAME)
             bucket = client.bucket(BUCKET_NAME)
-            print(bucket)
 
             gcs_wtwu_blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_DATA_PATH}{patient_id}/", delimiter='/')
 
@@ -65,6 +66,7 @@ def import_data(patient_id: str):
             # no_header = True
             eeg_data_headers = []
             all_eeg_data = []
+            survived = None
 
             for blob in gcs_wtwu_blobs:
                 # Download in memory to reduce I/O operations
@@ -101,8 +103,61 @@ def import_data(patient_id: str):
 
             return  survived, eeg_data_headers, np.array(all_eeg_data)
 
-        except:
-            print("Couldn't download from GCS")
+            ################# OLD ######################
+            # ##### TESTING
+            # order = "001"
+            # hour = "004"
+            # #####
+
+
+            # # .txt file with patient info
+            # patient_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}.txt")
+            # # .hea file with info about a single EEG recording
+            # eeg_header_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.hea")
+            # # .mat file with raw EEG data
+            # eeg_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.mat")
+            # # eeg_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.mat")
+
+            # for loop to
+                # download/stream eeg data (.mat) and eeg header (.hea) from GCS
+                # extract the data into a "manipulate-able" form
+            # ---> gcs_wtwu_blobs = gcs.list_blobs(BUCKET_NAME)
+
+            ################# OLD ######################
+
+
+
+            ##### TESTING
+            # print(".hea content:         ", hea_file_content) # lines from .hea file
+            #     # first line
+            #         #0284_001_004_EEG 19 500 1578500
+            #     # example middle lines
+            #         #0284_001_004_EEG.mat 16+24 17.980017665549088 16 23877 24177 37933865398 0 Fp1
+            #     # last three lines
+            #         #Utility frequency: 50
+            #         #Start time: 4:07:23
+            #         #End time: 4:59:59
+            # print(".hea content type:    ", type(hea_file_content)) # <class 'str'>
+            # print()
+
+            # print(".mat content:         ", eeg_file_content) # bunch of bytes
+            # print(".mat content type:    ", type(eeg_file_content)) # <class 'bytes'>
+            # print()
+            ######
+
+
+
+            ### debugging
+            # temp = "gs://data-wtwa/i-care-2.0.physionet.org/training/0284/0284.txt"
+            # temp = "i-care-2.0.physionet.org/training/0284/0284.txt"
+            # data-wtwa/gs://data-wtwa/i-care-2.0.physionet.org/training/0284/0284.txt
+            # https://storage.googleapis.com/download/storage/v1/b/data-wtwa/o/gs%3A%2F%2Fdata-wtwa%2Fi-care-2.0.physionet.org%2Ftraining%2F0284%2F0284.txt?alt=media
+            ###
+
+        except Exception as e :
+
+            print("Couldn't download from GCS", e)
+
             return "Error", "Error", "Error"
 
 
