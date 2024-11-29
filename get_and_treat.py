@@ -3,16 +3,18 @@ import wtwu.packages.data as wtdata
 import os
 import numpy as np
 import pickle
-
+import sys
 
 training_folder = "/home/mario/code/SeanDominique/will-they-wake-up/data/physionet.org/files/i-care/2.1/training"
 #list_of_patients = ['0931', '0826', '0693']
-list_of_patients = ([name for name in os.listdir(training_folder) if name.isnumeric()])
-
-for patient in list_of_patients[23:]:
+#list_of_patients = ([name for name in os.listdir(training_folder) if name.isnumeric()])
+patient = sys.argv[1]
+#for patient in list_of_patients:
+if not os.path.exists(f'./data/processed/{patient}/headers.pkl'):
 
     survived, eeg_data_headers, all_eeg_data = wtstorage.import_data(patient)
-    if eeg_data_headers != 'Error':
+    if eeg_data_headers != 'Error' and len(eeg_data_headers)>0:
+
         fs = eeg_data_headers[0]['fs']
         if not os.path.exists(f'./data/processed/{patient}'):
             os.makedirs(f'./data/processed/{patient}')
@@ -39,7 +41,7 @@ for patient in list_of_patients[23:]:
 
             np.save(f, list_of_splits)
 
-        with open(f'./data/processed/{patient}/headers.txt', 'wb') as f:
+        with open(f'./data/processed/{patient}/headers.pkl', 'wb') as f:
             pickle.dump(eeg_data_headers, f)
 
         print(patient, ' done!')
@@ -48,3 +50,5 @@ for patient in list_of_patients[23:]:
     del survived
     del eeg_data_headers
     del all_eeg_data
+else:
+    print(patient, ' already present!')
