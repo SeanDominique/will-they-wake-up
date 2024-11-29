@@ -10,6 +10,7 @@
 ######## IMPORTS #######
 import os
 from wtwu.params import *
+import re
 
 from google.cloud import storage
 from concurrent.futures import ThreadPoolExecutor
@@ -43,9 +44,7 @@ def import_data(patient_id: str):
     all_eeg_data = []
     # TODO: Start / connect to VM
 
-    client = storage.Client()
-    bucket = client.bucket(BUCKET_NAME)
-    print("print Bucket :", bucket)
+
     # import patient data
     if DATA_TARGET == "gcs":
 
@@ -55,9 +54,6 @@ def import_data(patient_id: str):
             # TODO: Threading to download blobs in parallel
 
             client = storage.Client()
-            print(client.project)
-            print(BUCKET_NAME)
-            bucket = client.bucket(BUCKET_NAME)
 
             gcs_wtwu_blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_DATA_PATH}{patient_id}/", delimiter='/')
 
@@ -86,7 +82,7 @@ def import_data(patient_id: str):
 
                 elif blob.name.endswith("EEG.hea"):
                     hea_file_content  = blob.download_as_text()
-                    hea_result = extract_header_data(hea_file_content)
+                    hea_result = extract_header_data(hea_file_content, blob.name)
                     eeg_data_headers.append(hea_result)
 
 
@@ -102,57 +98,6 @@ def import_data(patient_id: str):
                         eeg_data_headers.pop()
 
             return  survived, eeg_data_headers, np.array(all_eeg_data)
-
-            ################# OLD ######################
-            # ##### TESTING
-            # order = "001"
-            # hour = "004"
-            # #####
-
-
-            # # .txt file with patient info
-            # patient_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}.txt")
-            # # .hea file with info about a single EEG recording
-            # eeg_header_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.hea")
-            # # .mat file with raw EEG data
-            # eeg_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.mat")
-            # # eeg_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.mat")
-
-            # for loop to
-                # download/stream eeg data (.mat) and eeg header (.hea) from GCS
-                # extract the data into a "manipulate-able" form
-            # ---> gcs_wtwu_blobs = gcs.list_blobs(BUCKET_NAME)
-
-            ################# OLD ######################
-
-
-
-            ##### TESTING
-            # print(".hea content:         ", hea_file_content) # lines from .hea file
-            #     # first line
-            #         #0284_001_004_EEG 19 500 1578500
-            #     # example middle lines
-            #         #0284_001_004_EEG.mat 16+24 17.980017665549088 16 23877 24177 37933865398 0 Fp1
-            #     # last three lines
-            #         #Utility frequency: 50
-            #         #Start time: 4:07:23
-            #         #End time: 4:59:59
-            # print(".hea content type:    ", type(hea_file_content)) # <class 'str'>
-            # print()
-
-            # print(".mat content:         ", eeg_file_content) # bunch of bytes
-            # print(".mat content type:    ", type(eeg_file_content)) # <class 'bytes'>
-            # print()
-            ######
-
-
-
-            ### debugging
-            # temp = "gs://data-wtwa/i-care-2.0.physionet.org/training/0284/0284.txt"
-            # temp = "i-care-2.0.physionet.org/training/0284/0284.txt"
-            # data-wtwa/gs://data-wtwa/i-care-2.0.physionet.org/training/0284/0284.txt
-            # https://storage.googleapis.com/download/storage/v1/b/data-wtwa/o/gs%3A%2F%2Fdata-wtwa%2Fi-care-2.0.physionet.org%2Ftraining%2F0284%2F0284.txt?alt=media
-            ###
 
         except Exception as e :
 
@@ -179,7 +124,7 @@ def import_data(patient_id: str):
 # TODO: implement checkpoints to avoid reprocessing in case of failures
 
 
-def extract_header_data(header_file_content):
+def extract_header_data(header_file_content, file_name):
     """
     Takes the file content of a .hea as text and returns a dictionary with relevant values for EEG data preprocessing
 
@@ -188,6 +133,7 @@ def extract_header_data(header_file_content):
             "fs": # sampling frequency
             "num_channels": # number of total channels from recording
             "num_samples": # total number of samples in that .mat file
+            "recording_hour": the hour the recording was made after ROSC (Return Of Spontaneous Circulation)
             "channels_index": {}, # dictionary with the indexes of each channel in the `eeg_data` numpy array
             "all_channels_found": False # True if the data contains values for all the channels in `CHANNELS`
         }
@@ -196,9 +142,14 @@ def extract_header_data(header_file_content):
         "fs": 0,
         "num_channels": 0,
         "num_samples": 0,
+        "recording_hour": 0,
         "channels_index": {},
         "all_channels_found": False
     }
+
+    file_hour = re.search(r'_(\d{3})_(\d{3})_', file_name)
+    print(file_hour.group(2), file_name)
+    hea_result["recording_hour"] = file_hour.group(2)
 
     with io.StringIO(header_file_content) as f:
         lines = f.readlines()
@@ -277,6 +228,4 @@ if __name__ == "__main__":
     survived, eeg_data_headers, all_eeg_data = import_data("0430")
     print(survived)
     print(eeg_data_headers)
-    print(len(eeg_data_headers))
     print(all_eeg_data)
-    print(all_eeg_data.shape)
