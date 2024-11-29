@@ -8,7 +8,6 @@
 
 
 ######## IMPORTS #######
-
 import os
 from wtwu.params import *
 
@@ -56,6 +55,7 @@ def import_data(patient_id: str):
 
             gcs_wtwu_blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_DATA_PATH}{patient_id}/", delimiter='/')
 
+            # TODO: check if we actually need to collect multiple headers or if we can just use eeg_data.shape to check for sample length
             # # only collect the first header for a given patient
             # no_header = True
             eeg_data_headers = []
@@ -95,58 +95,6 @@ def import_data(patient_id: str):
                         eeg_data_headers.pop()
 
             return  survived, eeg_data_headers, np.array(all_eeg_data)
-
-
-            ################# OLD ######################
-            # ##### TESTING
-            # order = "001"
-            # hour = "004"
-            # #####
-
-
-            # # .txt file with patient info
-            # patient_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}.txt")
-            # # .hea file with info about a single EEG recording
-            # eeg_header_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.hea")
-            # # .mat file with raw EEG data
-            # eeg_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.mat")
-            # # eeg_data_filepath = os.path.join(PATIENT_DATA_PATH, patient_id, f"{patient_id}_{order}_{hour}_EEG.mat")
-
-            # for loop to
-                # download/stream eeg data (.mat) and eeg header (.hea) from GCS
-                # extract the data into a "manipulate-able" form
-            # ---> gcs_wtwu_blobs = gcs.list_blobs(BUCKET_NAME)
-
-            ################# OLD ######################
-
-
-
-            ##### TESTING
-            # print(".hea content:         ", hea_file_content) # lines from .hea file
-            #     # first line
-            #         #0284_001_004_EEG 19 500 1578500
-            #     # example middle lines
-            #         #0284_001_004_EEG.mat 16+24 17.980017665549088 16 23877 24177 37933865398 0 Fp1
-            #     # last three lines
-            #         #Utility frequency: 50
-            #         #Start time: 4:07:23
-            #         #End time: 4:59:59
-            # print(".hea content type:    ", type(hea_file_content)) # <class 'str'>
-            # print()
-
-            # print(".mat content:         ", eeg_file_content) # bunch of bytes
-            # print(".mat content type:    ", type(eeg_file_content)) # <class 'bytes'>
-            # print()
-            ######
-
-
-
-            ### debugging
-            # temp = "gs://data-wtwa/i-care-2.0.physionet.org/training/0284/0284.txt"
-            # temp = "i-care-2.0.physionet.org/training/0284/0284.txt"
-            # data-wtwa/gs://data-wtwa/i-care-2.0.physionet.org/training/0284/0284.txt
-            # https://storage.googleapis.com/download/storage/v1/b/data-wtwa/o/gs%3A%2F%2Fdata-wtwa%2Fi-care-2.0.physionet.org%2Ftraining%2F0284%2F0284.txt?alt=media
-            ###
 
         except:
             print("Couldn't download from GCS")
@@ -242,8 +190,6 @@ def extract_eeg_data(eeg_file_content, header):
     return eeg_data_arr
 
 
-
-
 def upload_processed_data_to_bq():
     """
     Upload preprocessed patient data to BQ DB.
@@ -255,8 +201,6 @@ def upload_processed_data_to_bq():
 
 
 ############### MODEL ###############
-
-
 def load_model_from_gcs():
     pass
 
@@ -269,69 +213,10 @@ def save_results_to_gcs():
     pass
 
 
-
-
 if __name__ == "__main__":
     survived, eeg_data_headers, all_eeg_data = import_data("0430")
     print(survived)
+    print(eeg_data_headers)
     print(len(eeg_data_headers))
+    print(all_eeg_data)
     print(all_eeg_data.shape)
-
-
-
-# def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None:
-#     """
-#     - Query the raw dataset from Le Wagon's BigQuery dataset
-#     - Cache query result as a local CSV if it doesn't exist locally
-#     - Process query data
-#     - Store processed data on your personal BQ (truncate existing table if it exists)
-#     - No need to cache processed data as CSV (it will be cached when queried back from BQ during training)
-#     """
-
-#     print(Fore.MAGENTA + "\n ⭐️ Use case: preprocess" + Style.RESET_ALL)
-
-#     # Query raw data from BigQuery using `get_data_with_cache`
-#     min_date = parse(min_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
-#     max_date = parse(max_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
-
-#     query = f"""
-#         SELECT {",".join(COLUMN_NAMES_RAW)}
-#         FROM `{GCP_PROJECT_WAGON}`.{BQ_DATASET}.raw_{DATA_SIZE}
-#         WHERE pickup_datetime BETWEEN '{min_date}' AND '{max_date}'
-#         ORDER BY pickup_datetime
-#     """
-
-#     # Retrieve data using `get_data_with_cache`
-#     data_query_cache_path = Path(LOCAL_DATA_PATH).joinpath("raw", f"query_{min_date}_{max_date}_{DATA_SIZE}.csv")
-#     data_query = get_data_with_cache(
-#         query=query,
-#         gcp_project=GCP_PROJECT,
-#         cache_path=data_query_cache_path,
-#         data_has_header=True
-#     )
-
-#     # Process data
-#     data_clean = clean_data(data_query)
-
-#     X = data_clean.drop("fare_amount", axis=1)
-#     y = data_clean[["fare_amount"]]
-
-#     X_processed = preprocess_features(X)
-
-#     # Load a DataFrame onto BigQuery containing [pickup_datetime, X_processed, y]
-#     # using data.load_data_to_bq()
-#     data_processed_with_timestamp = pd.DataFrame(np.concatenate((
-#         data_clean[["pickup_datetime"]],
-#         X_processed,
-#         y,
-#     ), axis=1))
-
-#     load_data_to_bq(
-#         data_processed_with_timestamp,
-#         gcp_project=GCP_PROJECT,
-#         bq_dataset=BQ_DATASET,
-#         table=f'processed_{DATA_SIZE}',
-#         truncate=True
-#     )
-
-#     print("✅ preprocess() done \n")

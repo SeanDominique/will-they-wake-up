@@ -1,7 +1,7 @@
 import scipy.io
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler,StandardScaler, RobustScaler
+from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
 import os
 from scipy.signal import welch
 
@@ -14,31 +14,6 @@ def clean_data():
     # deal with different frequencies based on hospitals
 
     # get the right channels
-
-    pass
-
-
-
-####################### PREPROCESS #################
-def standardize():
-    pass
-
-def impute():
-    pass
-
-def remove_channels():
-    pass
-
-def padding():
-    pass
-
-def remove_outliers():
-
-    # bandpass filter
-
-    # notch filter
-
-    # remove artefacts
 
     pass
 
@@ -264,7 +239,22 @@ def preprocess():
     pass
 
 
-
-
-def imputation():
+def standardize():
     pass
+
+def impute():
+    pass
+
+def remove_channels():
+    pass
+
+def padding():
+    pass
+
+def remove_outliers():
+
+    # bandpass filter
+
+    # notch filter
+
+    # remove artefacts
