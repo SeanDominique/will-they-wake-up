@@ -258,5 +258,3 @@ def remove_outliers():
     # notch filter
 
     # remove artefacts
-
-    pass

@@ -21,9 +21,7 @@ def preprocess():
 
 def train(input_shape, model, ):
     # model
-
     create_model()
-
 
     pass
 

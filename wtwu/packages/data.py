@@ -239,9 +239,7 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
 
             splits.append(EEG[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
 
-            if hours.shape != None:
-
-
+            if hours != None:
                 if i_EEG < len(hours):
                     split_time.append((hours[i_EEG])+((fs/sampling_rate)*i))
 
