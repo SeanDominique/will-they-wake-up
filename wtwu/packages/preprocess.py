@@ -37,9 +37,10 @@ def preprocess(patients=[]):
             survived, eeg_data_headers, all_eeg_data = import_data(patient)
 
             if eeg_data_headers != "Error" and len(eeg_data_headers) > 0:
-                print("skip")
-                # reduce all channels
-                    # undersampling of 125Hz and 128
+
+                # Réduction des données
+                    # undersampling of 125Hz and 128Hz (in research paper)
+                reduced_eeg_data = reduce_all_channels(all_eeg_data, target_freq=100, original_freq=fs)
 
                 # Waveform segmentation using rolling window
 
@@ -146,7 +147,24 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
 
     return EEG_list,hours
 
-def reduce_EEGs(list_of_EEGs, rate_of_reduction = 5, original_freq = 500):
+
+### Undersampling functions
+def reduce_all_channels(raw_eeg_all_channels, target_freq= 100, original_freq= 500):
+    """
+    Returns a np.array of all a patient's EEG data with only relevant channels.
+    """
+    #rate_of_reduction = np.round(rate_of_reduction)
+
+    raw_eeg_reduced_channels = []
+    for i in range(raw_eeg_all_channels.shape[0]):
+        raw_eeg_reduced_channels.append(reduce_eegs(raw_eeg_all_channels[i,:,:],
+                                              target_freq= target_freq,
+                                              original_freq=original_freq
+                                              ))
+
+    return np.array(raw_eeg_reduced_channels)
+
+def reduce_eegs(list_of_eeg, original_freq= 500, new_freq=100):
     '''
     This function takes a list of EEG spectra, the rate_of_reduction of the frequency
     and the original_frequency, the last two defaulted at 5 and 500.
@@ -158,31 +176,7 @@ def reduce_EEGs(list_of_EEGs, rate_of_reduction = 5, original_freq = 500):
     trying to create arrays of non-integer sizes.
 
     '''
-
-
-    rate_of_reduction = np.round(rate_of_reduction)
-
-    def single_reduction(EEG):
-            if len(EEG) % rate_of_reduction == 0:
-
-                print(f'EEG reduced to a {original_freq/rate_of_reduction} Hz frequence.')
-                return EEG.reshape(-1, int(rate_of_reduction) ).mean(axis=1)
-
-            else:
-                print('Data will be cut due to undivisible length.')
-
-                remaining = int(len(EEG) % rate_of_reduction)
-                print(f'Points lost: {remaining}')
-
-                EEG = EEG[:-remaining]
-                print(f'EEG reduced to a {original_freq/rate_of_reduction} Hz frequence.')
-
-                return EEG.reshape(-1, int(rate_of_reduction) ).mean(axis=1)
-    new_list_of_EEGs = []
-    for EEG in list_of_EEGs:
-        EEG = single_reduction(EEG)
-        new_list_of_EEGs.append(EEG)
-    return new_list_of_EEGs
+    return [resample_eeg_data(eeg, original_freq, new_freq) for eeg in list_of_eeg]
 
 def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
     """
@@ -211,23 +205,6 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
     # EEG.reshape(-1, int(resampling_ratio) ).mean(axis=1) --> TODO: Why?
 
     return undersampled_eeg_data
-
-
-
-def reduce_all_channels(raw_eeg_all_channels, target_freq= 100, original_freq= 500):
-    """
-    Returns a np.array of all a patient's EEG data with only relevant channels.
-    """
-    #rate_of_reduction = np.round(rate_of_reduction)
-
-    raw_eeg_reduced_channels = []
-    for i in range(raw_eeg_all_channels.shape[0]):
-        raw_eeg_reduced_channels.append(reduce_EEGs(raw_eeg_all_channels[i,:,:],
-                                              target_freq= target_freq,
-                                              original_freq=original_freq
-                                              ))
-
-    return np.array(raw_eeg_reduced_channels)
 
 def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=None):
     '''

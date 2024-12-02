@@ -32,7 +32,7 @@ def check_outcome(file_path):
     # Return 0 if 'Outcome' line is missing
     return 0
 
-
+# Packaged -> import_data
 def parse_eeg_file(file_path):
 
     '''get info from EEG.hea files.'''
@@ -60,8 +60,7 @@ def parse_eeg_file(file_path):
     return result
 
 
-
-
+# Packaged -> import_data
 def get_eeg_paths(directory):
     '''
     This function gets all the EEG file paths from a directory input, sorted over time.
@@ -81,6 +80,7 @@ def get_eeg_paths(directory):
     return sorted(eeg_files)
 
 
+# Packaged -> extract_EEG_data, extract_header_data
 def recover_eegs_and_hours(patient,scaler='Standard'):
     '''
     This function gets extracts all EEGs from a list of file paths (patient input) and puts it in a list.
@@ -154,18 +154,18 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
 
     return EEG_list, outcome, freq, hours
 
+
+# Packaged -> undersample_eegs
 def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
     '''
     This function takes a list of EEG spectra, the target frequency
     and the original_frequency, the last two defaulted at 100 and 500.
-
-
     '''
 
 
     #rate_of_reduction = np.round(rate_of_reduction)
 
-
+    # Packaged -> resample_eeg_data
     def resample_time_series_array(time_series, original_freq, target_freq):
         """
         Resample a time series to a target frequency, even if it's not a divisor of the original frequency.
@@ -206,6 +206,7 @@ def reduce_EEGs(list_of_EEGs, target_freq = 100, original_freq = 500):
     new_list_of_EEGs = np.array(new_list_of_EEGs)
     return new_list_of_EEGs
 
+# Packaged -> undersample_eegs
 def reduce_all_channels(channels_array, target_freq = 100, original_freq =500):
     #rate_of_reduction = np.round(rate_of_reduction)
 
