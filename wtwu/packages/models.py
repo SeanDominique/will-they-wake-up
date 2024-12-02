@@ -56,13 +56,13 @@ model = Sequential([
     Bidirectional(LSTM(64, return_sequences=False), input_shape=(1500, 8)),
     Dense(1, activation="sigmoid")
 ])
-"""
+
 def create_model2(input_shape):
 
-   """
+    """
 
     """
-    #model2 = Sequential()
+    model2 = Sequential()
     #Crée un modèle RNN avec des couches LSTM pour traiter les données temporelles.
     # Première couche LSTM
     model2.add(LSTM(64, activation='tanh', return_sequences=True, input_shape=input_shape))
@@ -84,7 +84,7 @@ def create_model2(input_shape):
     )
 
     return model2
-"""
+
 
 def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_model.keras", epochs=20):
     """
