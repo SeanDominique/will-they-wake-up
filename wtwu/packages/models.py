@@ -37,7 +37,7 @@ def create_model(input_shape):
     return model
 
 
-def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_model.h5", epochs=20):
+def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_model.keras", epochs=20):
     """
     Entraîne le modèle avec les données fournies.
     """
