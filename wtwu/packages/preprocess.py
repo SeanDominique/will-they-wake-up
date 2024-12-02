@@ -162,7 +162,6 @@ def reduce_EEGs(list_of_EEGs, rate_of_reduction = 5, original_freq = 500):
 
     rate_of_reduction = np.round(rate_of_reduction)
 
-
     def single_reduction(EEG):
             if len(EEG) % rate_of_reduction == 0:
 
@@ -187,7 +186,7 @@ def reduce_EEGs(list_of_EEGs, rate_of_reduction = 5, original_freq = 500):
 
 def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
     """
-    Resamples raw_eeg_data to compress the data.
+    Resamples raw_eeg_data, array-like of EEG spectra, to compress the data.
 
     Parameters:
         raw_eeg (np.ndarray):   TS data for a given EEG channel in the form on an 1D np.array.
@@ -197,12 +196,19 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
         undersampled_eeg_data (np.ndarray): Resampled TS
     """
 
-    undersampled_eeg_data = resample(raw_eeg, up=original_freq, down=new_freq)
+    resampling_ratio = original_freq / new_freq
+
+    undersampled_eeg_data = resample(raw_eeg, down=resampling_ratio)
 
     # in case resampled array is too large
     max_samples = max_seconds * new_freq
     if len(undersampled_eeg_data) > max_samples:
+        remaining = int(len(undersampled_eeg_data) % resampling_ratio)
         undersampled_eeg_data = undersampled_eeg_data[:max_samples]
+        print(f'Data points lost: {remaining}')
+
+    print(f'EEG reduced to a {original_freq/resampling_ratio} Hz frequence.')
+    # EEG.reshape(-1, int(resampling_ratio) ).mean(axis=1) --> TODO: Why?
 
     return undersampled_eeg_data
 
