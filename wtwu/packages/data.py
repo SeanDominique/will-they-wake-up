@@ -445,8 +445,8 @@ def create_global_dataset(bucket_name, prefix, patients):
             time_splits_blob = bucket.blob(f"{patient_prefix}/time_splits.npy")
             y_blob = bucket.blob(f"{patient_prefix}/y.txt")
 
-            time_splits_local = f"./code/will-they-wake-up/temp/{patient_id}_time_splits.npy"
-            y_local = f"./code/will-they-wake-up/temp/{patient_id}_y.txt"
+            time_splits_local = f"./temp/{patient_id}_time_splits.npy"
+            y_local = f"./temp/{patient_id}_y.txt"
 
             time_splits_blob.download_to_filename(time_splits_local)
             y_blob.download_to_filename(y_local)
