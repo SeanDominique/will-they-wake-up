@@ -35,7 +35,41 @@ def create_model(input_shape):
     )
 
     return model
+from tensorflow.keras.layers import Bidirectional, LSTM
 
+model = Sequential([
+    Bidirectional(LSTM(64, return_sequences=False), input_shape=(1500, 8)),
+    Dense(1, activation="sigmoid")
+])
+"""
+def create_model2(input_shape):
+
+   """
+    #Crée un modèle RNN avec des couches LSTM pour traiter les données temporelles.
+    """
+    #model2 = Sequential()
+
+    # Première couche LSTM
+    model2.add(LSTM(64, activation='tanh', return_sequences=True, input_shape=input_shape))
+    model2.add(Dropout(0.3))  # Régularisation
+
+    # Deuxième couche LSTM
+    model2.add(LSTM(32, activation='tanh'))
+    model2.add(Dropout(0.3))
+
+    #Troisieme couche LSTM
+    model2.add(Bidirectional(LSTM(64, return_sequences=False), input_shape=(1500, 8)))
+    # Couche Dense pour la sortie
+    model2.add(Dense(1, activation='sigmoid'))  # Sortie binaire (0 ou 1)
+
+    model2.compile(
+        optimizer='adam',
+        loss='binary_crossentropy',
+        metrics=['accuracy']
+    )
+
+    return model2
+"""
 
 def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_model.keras", epochs=20):
     """
