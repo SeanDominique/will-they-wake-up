@@ -1,27 +1,85 @@
-import scipy.io
+import os
+
+from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
+
+from wtwu.packages.storage import get_list_of_patients, import_data
+from wtwu.params import *
+
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
-import os
-from scipy.signal import welch
+import scipy.io
+from scipy.signal import welch, butter, filtfilt
+from mne.filter import resample
+
+####################### PREPROCESSING #######################
+
+def preprocess(patients=[]):
+    """
+    Prend une liste de patient (eg. ["0284", "0341", "1024"]). Preprocess la donnée EEG de chacun et upload sur GCS.
+    Cette fonction suppose que la donnée des patients est en local ou déja sur GCS.
+    """
+
+    # BUCKET_NAME =
+    # PATIENT_DATA_PATH -> "i-care-2.0.physionet.org/training/"
+    # local_processed_path -> destination
+    # preprocessed_path -> GCS path for processed data
 
 
-def clean_data():
-    # TODO: make sure column names are
+    # get patient data from GCS
+    if DATA_TARGET == "gcs":
+        if len(patients) == 0:
+            patients = get_list_of_patients()
 
-    # make sure everything is in the right shape
+        for patient in patients:
+            print(f"Traitement du patient {patient}...")
 
-    # deal with different frequencies based on hospitals
+            # Import des données
+            survived, eeg_data_headers, all_eeg_data = import_data(patient)
 
-    # get the right channels
+            if eeg_data_headers != "Error" and len(eeg_data_headers) > 0:
+                print("skip")
+                # reduce all channels
+                    # undersampling of 125Hz and 128
 
-    pass
+                # Waveform segmentation using rolling window
+
+                # Bandpass filter (0.1-45Hz)
+
+                # Notch filter
+
+                # standardize (z-score normalization)
+
+                # clean_data() (AIRhythm -> unified EEG + ECG Channels)
+
+                # calcul des PSD
+
+                # Preprocessing patient data DONE
+
+                # upload to relevant GCS bucket
+
+
+            else:
+                print(f"Patient {patient} : Données introuvables ou incorrectes.")
+
+        else:
+            # TODO: select specific patients
+            print(f"Selection spécificque de patient n'est pas encore possible.")
+
+            # if patient_local_path:
+            #     upload_preprocessed_to_gcp(patient_local_path, bucket_name, preprocessed_path, patient)
+
+
+    elif "local":
+        print("uploading patient data from local...")
+        print("failed") # TODO: logic
+        return
+
+    return
 
 
 ####################### ECHANTILLONAGE #######################
-
-
 file_path = '/home/mariorocha/code/SeanDominique/will-they-wake-up/data/raw/physionet.org/files/i-care/2.1/training/0284/'
+
 ##TODO Change the path using os, if possible making the patient a variable.
 def get_eeg_paths(directory):
     '''
@@ -40,7 +98,6 @@ def get_eeg_paths(directory):
                 eeg_files.append(absolute_path)
 
     return sorted(eeg_files)
-
 
 def recover_eegs_and_hours(patient,scaler='Standard'):
     '''
@@ -128,6 +185,44 @@ def reduce_EEGs(list_of_EEGs, rate_of_reduction = 5, original_freq = 500):
         new_list_of_EEGs.append(EEG)
     return new_list_of_EEGs
 
+def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
+    """
+    Resamples raw_eeg_data to compress the data.
+
+    Parameters:
+        raw_eeg (np.ndarray):   TS data for a given EEG channel in the form on an 1D np.array.
+        original_freq (float):  Original frequency in Hz
+        new_freq (float):       Target frequency in Hz
+    Returns:
+        undersampled_eeg_data (np.ndarray): Resampled TS
+    """
+
+    undersampled_eeg_data = resample(raw_eeg, up=original_freq, down=new_freq)
+
+    # in case resampled array is too large
+    max_samples = max_seconds * new_freq
+    if len(undersampled_eeg_data) > max_samples:
+        undersampled_eeg_data = undersampled_eeg_data[:max_samples]
+
+    return undersampled_eeg_data
+
+
+
+def reduce_all_channels(raw_eeg_all_channels, target_freq= 100, original_freq= 500):
+    """
+    Returns a np.array of all a patient's EEG data with only relevant channels.
+    """
+    #rate_of_reduction = np.round(rate_of_reduction)
+
+    raw_eeg_reduced_channels = []
+    for i in range(raw_eeg_all_channels.shape[0]):
+        raw_eeg_reduced_channels.append(reduce_EEGs(raw_eeg_all_channels[i,:,:],
+                                              target_freq= target_freq,
+                                              original_freq=original_freq
+                                              ))
+
+    return np.array(raw_eeg_reduced_channels)
+
 def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=None):
     '''
     This function takes a list of EEGs, their frequency, the sampling rate in seconds
@@ -165,9 +260,7 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
         split_time = np.array(split_time)
     return splits, split_time
 
-
-
-
+# TODO: Add data.sample_all()
 
 def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
     '''
@@ -232,15 +325,38 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
         return None
 
 
+####################### CLEANING THE DATA #######################
+def clean_data():
+    # TODO: make sure column names are
 
-####################### PREPROCESSING #######################
+    # make sure everything is in the right shape
 
-def preprocess():
+    # deal with different frequencies based on hospitals
+
+    # get the right channels
+
     pass
 
 
-def standardize():
-    pass
+def standardize(eeg_data: np.array, scaler="standard") -> np.array:
+    """
+    Return a numpy array with the standardized EEG data based on the given scaler
+    """
+
+    match scaler:
+        case "standard":
+            scale = StandardScaler()
+        case "minmax":
+            scale = MinMaxScaler()
+        case "robust":
+            scale = RobustScaler()
+        case None:
+            print("no standardization applied")
+            return eeg_data
+
+    eeg_data = scale.fit_transform(eeg_data)
+    return eeg_data
+
 
 def impute():
     pass
@@ -248,13 +364,53 @@ def impute():
 def remove_channels():
     pass
 
+
 def padding():
     pass
 
-def remove_outliers():
+
+def resampling():
+    # Mario's code optimized with MNE
+
+    # epoch the data before resampling otherwise
+
+    # mneresample()
+    pass
+
+def remove_outliers(eeg_data: np.array):
+    """
+    Return a numpy array of EEG data without arterfacts.
+    """
 
     # bandpass filter
+    # TODO: parametrize these variables
+    low_freq = 0.01
+    high_freq = 40
+    fs = 100
+    order = 4
 
-    # notch filter
+    nyq = 0.5*fs
+    normal_cutoff = low_freq / nyq
+    b, a = butter(order, normal_cutoff, btype="lowpass")
 
     # remove artefacts
+
+    # from MNE docu: frequency-restricted artifacts are slow drifts and power line noise
+    # power line noise -> notch filter
+
+    # slow-drift
+
+
+
+if "__main__" == __name__:
+    n_freqs = 643
+    seconds = 15
+    total_samples = n_freqs*seconds
+    raw_eeg = np.linspace(50,total_samples+100,n_freqs)
+    print(n_freqs)
+    print(raw_eeg)
+    print(len(raw_eeg))
+    print()
+    resampled_data = resample_eeg_data(raw_eeg, n_freqs,100)
+    print(resampled_data)
+    print(len(resampled_data))
