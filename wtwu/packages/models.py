@@ -47,7 +47,7 @@ def create_model(input_shape):
     model.compile(
         optimizer='adam',
         loss='binary_crossentropy',
-        metrics=[true_positive_ratio, false_positive_ratio,'accuracy']
+        metrics=['accuracy','recall']
     )
 
     return model
