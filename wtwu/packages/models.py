@@ -1,133 +1,131 @@
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Bidirectional, LSTM, Dense, Dropout
 from keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from datetime import datetime
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+import numpy as np
+import os
+import json
 
-def create_model(input_shape, dense_units=32, dropout_rate=0.3):
+def create_model(input_shape):
     """
-    model LSTM bidirectionne
-    Parametres:
-        input_shape (tuple): Dimensions de l'entrée (n_timepoints, n_channels).
-        lstm_units (tuple): Neurones pour chaque couche LSTM bidirectionnelle.
-        dense_units (int): Neurones dans la couche Fully Connected.
-        dropout_rate (float): Taux de Dropout.
-    Returns:
-        model (Sequential): Modèle Keras compilé.
+    Crée un modèle RNN avec des couches LSTM pour traiter les données temporelles.
     """
-    model = Sequential([
-        # couche LSTM
-        Bidirectional(LSTM(64, return_sequences=True, input_shape=input_shape)),
-        Dropout(dropout_rate),
+    model = Sequential()
 
-        # couche LSTM
-        Bidirectional(LSTM(32)),
-        Dropout(dropout_rate),
+    # Première couche LSTM
+    model.add(LSTM(64, activation='tanh', return_sequences=True, input_shape=input_shape))
+    model.add(Dropout(0.3))  # Régularisation
 
-        # Couche Fully Connected
-        Dense(dense_units, activation='relu'),
-        Dropout(dropout_rate),
+    # Deuxième couche LSTM
+    model.add(LSTM(32, activation='tanh'))
+    model.add(Dropout(0.3))
 
-        # Couche de sortie pour classification binaire
-        Dense(1, activation='sigmoid')
-    ])
+    # Couche Dense pour la sortie
+    model.add(Dense(1, activation='sigmoid'))  # Sortie binaire (0 ou 1)
 
-    # Compilation du modèle
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(
+        optimizer='adam',
+        loss='binary_crossentropy',
+        metrics=['accuracy']
+    )
 
     return model
 
-def compile_model(model, optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']):
+
+def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_model.h5", epochs=20):
     """
-    Compile le modèle avec les paramètres spécifiés.
-
-    Parameters:
-        model (Sequential): Le modèle Keras à compiler.
-        optimizer (str or keras.optimizers): Optimisateur à utiliser (par défaut 'adam').
-        loss (str): Fonction de perte (par défaut 'binary_crossentropy').
-        metrics (list): Liste des métriques à suivre (par défaut ['accuracy']).
-
-    Returns:
-        model (Sequential): Modèle Keras compilé.
+    Entraîne le modèle avec les données fournies.
     """
-    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    return model
-
-
-def train_model(model, X_train, y_train, X_val=None, y_val=None, batch_size=32, epochs=20, use_early_stopping=False):
-    """
-    Entraîne le modèle avec possibilité d'utiliser l'Early Stopping.
-
-    Parameters:
-        model (Sequential): Modèle Keras à entraîner.
-        X_train (ndarray): Données d'entraînement.
-        y_train (ndarray): Labels d'entraînement.
-        X_val (ndarray): Données de validation (optionnel).
-        y_val (ndarray): Labels de validation (optionnel).
-        batch_size (int): Taille des lots (par défaut 32).
-        epochs (int): Nombre d'époques (par défaut 20).
-        use_early_stopping (bool): Utiliser l'Early Stopping (par défaut False).
-
-    Returns:
-        history (History): Historique d'entraînement du modèle.
-    """
+    # Callbacks pour stopper l'entraînement et sauvegarder le meilleur modèle
     early_stopping = EarlyStopping(
-            monitor='val_loss',
-            patience=5,
-            restore_best_weights=True
-        )
+        monitor='val_loss',
+        patience=3,
+        restore_best_weights=True
+    )
+    model_checkpoint = ModelCheckpoint(
+        save_path,
+        monitor='val_loss',
+        save_best_only=True
+    )
 
-    # Entraînement avec ou sans validation
-    if X_val is not None and y_val is not None:
-        history = model.fit(
-            X_train, y_train,
-            validation_data=(X_val, y_val),
-            batch_size=batch_size,
-            epochs=epochs,
-            early_stopping=early_stopping
-        )
-    else:
-        history = model.fit(
-            X_train, y_train,
-            batch_size=batch_size,
-            epochs=epochs,
-            early_stopping=early_stopping
-        )
+    # Entraîner le modèle
+    history = model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        epochs=epochs,
+        batch_size=min(32, len(y_train) // 10),  # Ajuster selon la taille des données
+        callbacks=[early_stopping, model_checkpoint],
+        verbose=1
+    )
+
     return history
 
 
-def evaluate_model(model, X_test, y_test, batch_size=8):
+def evaluate_model(model, X_test, y_test):
     """
-    Évalue le modèle sur les données de test.
-    Parameters:
-        model (Sequential): Modèle Keras à évaluer.
-        X_test (ndarray): Données de test.
-        y_test (ndarray): Labels de test.
-        batch_size (int): Taille des lots (par défaut 32)
-    Returns:
-        results (dict): Dictionnaire contenant la perte et les métriques spécifiées.
+    Évalue le modèle sur l'ensemble de test.
     """
+    # Prédictions
+    y_pred_prob = model.predict(X_test).flatten()
+    y_pred = (y_pred_prob > 0.5).astype("int32")
 
-    # Évaluation du modèle
-    evaluation = model.evaluate(X_test, y_test, batch_size=batch_size, verbose=1)
-    # Récupérer les noms des métriques
-    metrics_names = model.metrics_names
-    # Créer un dictionnaire des résultats
-    results = {metric: value for metric, value in zip(metrics_names, evaluation)}
+    # Calcul des métriques
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
 
-    return results
+    print("Évaluation sur l'ensemble de test :")
+    print(f"Précision (Accuracy) : {accuracy:.4f}")
+    print(f"Précision (Precision) : {precision:.4f}")
+    print(f"Rappel (Recall) : {recall:.4f}")
+    print(f"F1-Score : {f1:.4f}")
+    print(f"Matrice de confusion :\n{cm}")
+
+    return y_pred, y_pred_prob, accuracy, precision, recall, f1
 
 
-def model_predict():
-    # get new data
-    # from storage import *
+def save_model_local(model, base_dir="./Metrics_wtwa"):
+    """
+    Sauvegarde le modèle localement dans un dossier dédié avec un nom incrémenté et une date.
+    """
+    # Créer le répertoire principal s'il n'existe pas
+    os.makedirs(base_dir, exist_ok=True)
 
-    # clean, preprocess the data
-    # from preprocess import *
+    # Générer un nom unique basé sur la date et l'incrémentation
+    date_today = datetime.now().strftime("%Y-%m-%d")
+    existing_files = [f for f in os.listdir(base_dir) if f.startswith("model_")]
+    next_index = len(existing_files) + 1
+    save_path = os.path.join(base_dir, f"model_{next_index}_{date_today}.h5")
 
-    # TODO: actually make the prediction
+    # Sauvegarder le modèle
+    model.save(save_path)
+    print(f"Modèle sauvegardé localement dans {save_path}")
+    return save_path
 
-    # save the scores of the model in GCS
-    # from model import *
 
-    pass
-s
-create_model(dense_units=32, dropout_rate=0.3)
+def save_metrics_local(metrics, base_dir="./Metrics_wtwa"):
+    """
+    Sauvegarde les métriques d'entraînement/validation localement dans un fichier JSON avec un nom unique.
+    """
+    # Créer le répertoire principal s'il n'existe pas
+    os.makedirs(base_dir, exist_ok=True)
+
+    # Générer un nom unique basé sur la date et l'incrémentation
+    date_today = datetime.now().strftime("%Y-%m-%d")
+    existing_files = [f for f in os.listdir(base_dir) if f.startswith("metrics_")]
+    next_index = len(existing_files) + 1
+    save_path = os.path.join(base_dir, f"metrics_{next_index}_{date_today}.json")
+
+    # Sauvegarder les métriques dans un fichier JSON
+    with open(save_path, "w") as f:
+        json.dump(metrics, f, indent=4)
+
+    print(f"Métriques sauvegardées localement dans {save_path}")
+    return save_path

@@ -60,7 +60,7 @@ def preprocess_patient(patient, local_path):
             mean = np.mean(list_of_splits, axis=0)
             std = np.where(std == 0, 1, std)
             list_of_splits = (list_of_splits - mean) / std
-
+            print("print fin prepro")
             # Calcul des PSD
             psds_fs, list_of_psds = wtdata.get_psds(list_of_splits)
 
@@ -98,6 +98,7 @@ def delete_local_files(patient_local_path):
     Supprime les fichiers locaux d'un patient après leur upload.
     """
     if os.path.exists(patient_local_path):
+        print("avant suppressions local")
         for file_name in os.listdir(patient_local_path):
             file_path = os.path.join(patient_local_path, file_name)
             os.remove(file_path)  # Supprimer chaque fichier

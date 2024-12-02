@@ -13,4 +13,6 @@ gunicorn>=20.0.4
 ipykernel
 plotly
 librosa
+google-cloud-bigquery
+matplotlib
 nbformat>=4.2.0

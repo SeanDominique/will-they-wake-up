@@ -4,6 +4,9 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler,StandardScaler, RobustScaler
 import os
 from scipy.signal import welch
+import os
+import numpy as np
+from google.cloud import storage
 
 
 
@@ -346,3 +349,127 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='array'):
     else:
         print('get_psds: bad input type')
         return None
+
+
+
+client = storage.Client()
+
+def list_gcs_files(bucket_name, prefix):
+    bucket = client.bucket(bucket_name)
+    blobs = bucket.list_blobs(prefix=prefix)
+    return [blob.name for blob in blobs]
+
+def validate_patient_data(bucket_name, prefix, patients):
+    """
+    Vérifie que chaque patient a les fichiers nécessaires sur GCP et signale les données manquantes.
+    Si le dossier d'un patient est absent, il est ignoré.
+    """
+    required_files = ["psds.npy", "times.npy", "y.txt"]
+    files_on_gcs = list_gcs_files(bucket_name, prefix)  # Liste complète des fichiers présents
+    missing_data = []
+
+    for patient in patients:
+        # Formater l'ID du patient avec des zéros (toujours 4 chiffres)
+        patient_id = f"{int(patient):04d}"
+        patient_prefix = f"{prefix}/{patient_id}"
+
+        # Vérifier si le dossier du patient existe
+        if not any(file.startswith(patient_prefix) for file in files_on_gcs):
+            print(f"Dossier manquant pour le patient {patient_id}, passage au suivant.")
+            continue
+
+        # Vérifier la présence des fichiers nécessaires
+        for file_name in required_files:
+            expected_file = f"{patient_prefix}/{file_name}"
+            if expected_file not in files_on_gcs:
+                missing_data.append((patient_id, expected_file))
+
+    if missing_data:
+        print("Données manquantes :")
+        for patient_id, file_path in missing_data:
+            print(f"Patient {patient_id}, Fichier manquant : {file_path}")
+        return False
+    else:
+        print("Toutes les données nécessaires sont présentes.")
+        return True
+
+def create_batches(data, labels, batch_size):
+    """
+    Découpe les données et les labels en batchs de taille fixe.
+    """
+    num_batches = len(data) // batch_size
+    data_batches = [
+        data[i * batch_size:(i + 1) * batch_size]
+        for i in range(num_batches)
+    ]
+    label_batches = [
+        labels[i * batch_size:(i + 1) * batch_size]
+        for i in range(num_batches)
+    ]
+
+    # Si des données restantes, créer un dernier batch
+    if len(data) % batch_size != 0:
+        data_batches.append(data[num_batches * batch_size:])
+        label_batches.append(labels[num_batches * batch_size:])
+
+    print(f"Nombre de batchs : {len(data_batches)}")
+    return data_batches, label_batches
+
+
+
+def blob_exists(bucket, blob_name):
+    """
+    Vérifie si un fichier existe dans le bucket GCP.
+    """
+    blob = bucket.blob(blob_name)
+    return blob.exists()
+
+import numpy as np
+
+def create_global_dataset(bucket_name, prefix, patients):
+    """
+    Charge les données `time_splits` et les labels `y` pour tous les patients,
+    et les concatène en un dataset global.
+    """
+    all_time_splits = []
+    all_labels = []
+
+    for patient in patients:
+        try:
+            # Formater l'ID du patient avec des zéros
+            patient_id = f"{int(patient):04d}"
+            patient_prefix = f"{prefix}/{patient_id}"
+
+            # Charger les fichiers nécessaires depuis GCP
+            time_splits_blob = bucket_name.blob(f"{patient_prefix}/time_splits.npy")
+            y_blob = bucket_name.blob(f"{patient_prefix}/y.txt")
+
+            time_splits_local = f"./temp/{patient_id}_time_splits.npy"
+            y_local = f"./temp/{patient_id}_y.txt"
+
+            time_splits_blob.download_to_filename(time_splits_local)
+            y_blob.download_to_filename(y_local)
+
+            # Charger les données localement
+            time_splits = np.load(time_splits_local)
+            with open(y_local, "r") as f:
+                raw_label = f.readline().split(":")[1].strip()
+                label = 1 if raw_label.lower() == "true" else 0
+
+            # Ajouter les données au dataset global
+            all_time_splits.append(time_splits)
+            all_labels.extend([label] * len(time_splits))
+
+            # Nettoyer les fichiers locaux
+            os.remove(time_splits_local)
+            os.remove(y_local)
+
+        except Exception as e:
+            print(f"Erreur pour le patient {patient_id} : {e}")
+
+    # Concaténer toutes les données
+    all_time_splits = np.concatenate(all_time_splits, axis=0)
+    all_labels = np.array(all_labels)
+
+    print(f"Dataset global créé : {all_time_splits.shape}, {all_labels.shape}")
+    return all_time_splits, all_labels
