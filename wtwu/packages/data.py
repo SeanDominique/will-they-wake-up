@@ -97,7 +97,7 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
     There's a commented line if we want to do the mean of all channels.
 
     '''
-    outcome = check_outcome(patient+patient[-5:-1]+'.txt')
+    outcome = check_outcome(patient+patient[-5:]+'.txt')
     EEG_file_list = get_eeg_paths(patient)
     hours =[]
 
@@ -218,7 +218,7 @@ def reduce_all_channels(channels_array, target_freq = 100, original_freq =500):
     reduced_channels = np.array(reduced_channels)
     return reduced_channels
 
-def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=None):
+def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=np.zeros((10000,))):
     '''
     This function takes a list of EEGs, their frequency, the sampling rate in seconds
     (every 10 min = 600), the sampling size in seconds, and if available, the list of
@@ -233,29 +233,35 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
 
     splits = []
     split_time = []
-    i_EEG = 0
+
 
     for EEG in list_of_EEGs:
-
         i = 0
+
+
         while ((sampling_rate*i) + sampling_size)*fs < len(EEG):
+            #print((len(EEG),((sampling_rate*i) + sampling_size)*fs), 'print 1')
 
             splits.append(EEG[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
 
-            if hours.shape != None:
-                if i_EEG < len(hours):
-                    split_time.append((hours[i_EEG])+((fs/sampling_rate)*i))
+            if hours.shape != (10000,):
+                #print((hours), 'print 2')
+
+                split_time.append((hours)+((fs/sampling_rate)*i))
+                #print(hours,(hours)+((fs/sampling_rate)*i), 'print 3')
 
             i += 1
 
-        i_EEG += 1
+
 
 
 
 
     splits = np.array(splits)
+
     if len(split_time)>0:
         split_time = np.array(split_time)
+        print(splits.shape, split_time.shape)
 
     return splits, split_time
 
@@ -264,23 +270,32 @@ def sample_all(reduced_array, fs=100, sampling_rate=600, sampling_size=15,hours=
     list_of_splits = []
     list_of_split_times = []
     for i in range(0,reduced_array.shape[0]):
-        split, split_time = sampling_EEGs(reduced_array[i,:,:],hours=hours)
+        split, split_time = sampling_EEGs(reduced_array[i,:,:],hours=hours[i])
+        #print(split_time[:int(sampling_rate/fs)])
         list_of_splits.append(split)
-        list_of_split_times.append(split_time)
+        list_of_split_times.append(split_time[:int(sampling_rate/fs)])
 
     list_of_splits = np.array(list_of_splits)
+
     list_of_splits = list_of_splits.reshape(int(list_of_splits.shape[0]),8,int(list_of_splits.shape[1]/8),int(list_of_splits.shape[2]))
     list_of_splits = np.transpose(list_of_splits,axes=(0,2,3,1))
     list_of_splits = list_of_splits.reshape(list_of_splits.shape[0]*list_of_splits.shape[1],list_of_splits.shape[2],list_of_splits.shape[3])
+
     if len(list_of_split_times)>0:
-        list_of_split_times = np.array(list_of_split_times)
-        list_of_split_times = list_of_split_times[0,:]
+        print(list_of_split_times)
+
+        list_of_split_times = np.concatenate(list_of_split_times)
+        print(list_of_split_times)
+        #list_of_split_times = list_of_split_times[np.mod(np.arange(list_of_split_times.size), 8) != 0]
+        #print(list_of_split_times.shape)
+
+        #list_of_split_times = list_of_split_times[:,0]
 
     return list_of_splits, list_of_split_times
 
 
 
-def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='array'):
+def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input_type='array'):
     '''
     This function takes an array or list of EEGs and returns the PSDs.
     It can have two modes: 'channels' or 'time':
@@ -297,10 +312,7 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='array'):
 
     '''
 
-    if hours != None:
 
-
-        hours_df = pd.DataFrame(hours,columns='time')
 
     if input_type == 'list':
         psds = []
@@ -309,13 +321,13 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='array'):
             psds.append(temp_psd)
         psds_df = pd.DataFrame(psds)
         if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
-            psds_df = pd.concat([psds_df, hours_df], axis=1)
+            psds_df = pd.concat([psds_df, hours], axis=1)
             psds_df = psds_df.groupby(by='hours',as_index=True).mean()
-            return psds_df, f
+            return f, psds_df
         elif mode == 'time':
-            return psds_df, f
+            return f, psds_df
         elif mode == 'channels':
-            return psds, f
+            return f, psds_df
         else:
             print('get_psds: unrecognised mode.')
             return None
@@ -336,7 +348,7 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='array'):
         if mode == 'time':
             psds_df = pd.DataFrame(psds_ar)
             if hours.shape[0] == psds_ar.shape[1]:
-                psds_df = pd.concat([psds_df, hours_df], axis=1)
+                psds_df = pd.concat([psds_df, hours], axis=1)
                 psds_df = psds_df.groupby(by='hours',as_index=True).mean()
                 return f, psds_df
             return f, psds_df
@@ -384,7 +396,7 @@ def validate_patient_data(bucket_name, prefix, patients):
             if expected_file not in files_on_gcs:
                 missing_data.append((patient_id, expected_file))
 
-    if missing_data:
+    if len(missing_data) > 0:
         print("Données manquantes :")
         for patient_id, file_path in missing_data:
             print(f"Patient {patient_id}, Fichier manquant : {file_path}")
@@ -464,6 +476,70 @@ def create_global_dataset(bucket_name, prefix, patients):
             # Nettoyer les fichiers locaux
             os.remove(time_splits_local)
             os.remove(y_local)
+
+        except Exception as e:
+            print(f"Erreur pour le patient {patient_id} : {e}")
+
+    # Concaténer toutes les données
+    all_time_splits = np.concatenate(all_time_splits, axis=0)
+    all_labels = np.array(all_labels)
+
+    print(f"Dataset global créé : {all_time_splits.shape}, {all_labels.shape}")
+    return all_time_splits, all_labels
+
+def create_time_dependent_dataset(bucket_name, prefix, patients, initial_time=0,end_time=1000):
+    """
+    Charge les données `time_splits` et les labels `y` pour tous les patients,
+    et les concatène en un dataset global.
+    """
+    all_time_splits = []
+    all_labels = []
+    bucket = client.bucket(bucket_name)
+
+    for patient in patients:
+        try:
+            # Formater l'ID du patient avec des zéros
+            patient_id = f"{int(patient):04d}"
+            patient_prefix = f"{prefix}/{patient_id}"
+
+            # Charger les fichiers nécessaires depuis GCP
+            time_splits_blob = bucket.blob(f"{patient_prefix}/time_splits.npy")
+            y_blob = bucket.blob(f"{patient_prefix}/y.txt")
+
+            time_splits_local = f"./temp/{patient_id}_time_splits.npy"
+            y_local = f"./temp/{patient_id}_y.txt"
+
+            time_stamps_local = f"./temp/{patient_id}_times.npy"
+
+            time_splits_blob.download_to_filename(time_splits_local)
+            y_blob.download_to_filename(y_local)
+
+            # Charger les données localement
+            time_splits = np.load(time_splits_local)
+            print(time_splits.shape)
+            time_stamps = np.load(time_stamps_local)
+            print(time_stamps)
+            mask = (time_stamps >= initial_time) & (time_stamps <= end_time)
+            print(mask.shape)
+            time_splits = time_splits[mask]
+
+
+            with open(y_local, "r") as f:
+                raw_label = f.readline().split(":")[1].strip()
+                label = 1 if raw_label.lower() == "true" else 0
+
+            # Ajouter les données au dataset global
+            if len(time_splits) > 0:
+
+                all_time_splits.append(time_splits)
+                all_labels.extend([label] * len(time_splits))
+            else:
+                print(f"Patient {patient_id} : pas de données entre {initial_time} et {end_time} heures.")
+            # Nettoyer les fichiers locaux
+            os.remove(time_splits_local)
+            os.remove(y_local)
+            os.remove(time_stamps_local)
+
 
         except Exception as e:
             print(f"Erreur pour le patient {patient_id} : {e}")

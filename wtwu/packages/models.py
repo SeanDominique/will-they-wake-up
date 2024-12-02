@@ -5,11 +5,27 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from datetime import datetime
+import tensorflow.keras.backend as K
+
+
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 import numpy as np
 import os
 import json
+
+def true_positive_ratio(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    false_positives = K.sum(K.round(K.clip((1 - y_true) * y_pred, 0, 1)))
+    false_negatives = K.sum(K.round(K.clip(y_true * (1 - y_pred), 0, 1)))
+    return true_positives/(false_negatives + false_positives)
+
+def false_positive_ratio(y_true,y_pred):
+    true_negatives = K.sum(K.round(K.clip((1 - y_true) * (1 - y_pred), 0, 1)))
+    false_positives = K.sum(K.round(K.clip((1 - y_true) * y_pred, 0, 1)))
+    return false_positives / (false_positives + true_negatives)
+
+
 
 def create_model(input_shape):
     """
@@ -31,7 +47,7 @@ def create_model(input_shape):
     model.compile(
         optimizer='adam',
         loss='binary_crossentropy',
-        metrics=['accuracy']
+        metrics=[true_positive_ratio, false_positive_ratio,'accuracy']
     )
 
     return model
@@ -58,7 +74,8 @@ def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_
         X_train, y_train,
         validation_data=(X_val, y_val),
         epochs=epochs,
-        batch_size=min(32, len(y_train) // 10),  # Ajuster selon la taille des données
+        shuffle=True,
+        batch_size=min(128, len(y_train) // 10),  # Ajuster selon la taille des données
         callbacks=[early_stopping, model_checkpoint],
         verbose=1
     )
@@ -80,15 +97,17 @@ def evaluate_model(model, X_test, y_test):
     recall = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred)
+    tpr = true_positive_ratio(y_test,y_pred)
 
     print("Évaluation sur l'ensemble de test :")
     print(f"Précision (Accuracy) : {accuracy:.4f}")
     print(f"Précision (Precision) : {precision:.4f}")
     print(f"Rappel (Recall) : {recall:.4f}")
     print(f"F1-Score : {f1:.4f}")
+    print(f"True Positive Ratio : {tpr:.4f}")
     print(f"Matrice de confusion :\n{cm}")
 
-    return y_pred, y_pred_prob, accuracy, precision, recall, f1
+    return y_pred, y_pred_prob, accuracy, precision, recall, f1, tpr
 
 
 def save_model_local(model, base_dir="./Metrics_wtwa"):
