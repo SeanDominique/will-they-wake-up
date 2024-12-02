@@ -4,6 +4,7 @@ from storage import save_metrics_to_bigquery
 from models import save_metrics_local
 import numpy as np
 from wtwu import params
+import os
 
 # Configurations
 project_id = params.PROJECT_ID
@@ -12,6 +13,8 @@ bucket_name = "data-wtwa"
 prefix = "preprocessed"
 batch_size = 32
 patients = [str(i) for i in range(284, 385)]  # Liste des patients (à ajuster selon vos données)
+
+print("Current working directory:", os.getcwd())
 
 # Étape 1 : Valider les données
 if not validate_patient_data(bucket_name, prefix, patients):
