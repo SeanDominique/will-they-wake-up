@@ -35,7 +35,6 @@ def create_model(input_shape):
     )
 
     return model
-from tensorflow.keras.layers import Bidirectional, LSTM
 
 model = Sequential([
     Bidirectional(LSTM(64, return_sequences=False), input_shape=(1500, 8)),
@@ -45,10 +44,10 @@ model = Sequential([
 def create_model2(input_shape):
 
    """
-    #Crée un modèle RNN avec des couches LSTM pour traiter les données temporelles.
+
     """
     #model2 = Sequential()
-
+    #Crée un modèle RNN avec des couches LSTM pour traiter les données temporelles.
     # Première couche LSTM
     model2.add(LSTM(64, activation='tanh', return_sequences=True, input_shape=input_shape))
     model2.add(Dropout(0.3))  # Régularisation
