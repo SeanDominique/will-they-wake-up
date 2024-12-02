@@ -18,7 +18,7 @@ from scipy.io import loadmat
 import numpy as np
 import pandas as pd
 import io
-
+from google.cloud import bigquery
 # # to automate with model lifecycle
 # import mlflow
 # import pickle
@@ -212,16 +212,38 @@ def upload_processed_data_to_bq():
 
 
 ############### MODEL ###############
-def load_model_from_gcs():
-    pass
 
 
-def save_model_to_gcs():
-    pass
+
+def save_metrics_to_bigquery(project_id, dataset_id, table_id, metrics):
+    """
+    Sauvegarde les métriques d'entraînement/validation dans une table BigQuery.
+    """
+    client = bigquery.Client(project=project_id)
+    table_ref = f"{project_id}.{dataset_id}.{table_id}"
+
+    # Insérer dans BigQuery
+    errors = client.insert_rows_json(table_ref, metrics)
+    if errors:
+        print(f"Erreur lors de l'insertion des métriques : {errors}")
+    else:
+        print("Métriques sauvegardées dans BigQuery.")
 
 
-def save_results_to_gcs():
-    pass
+def save_predictions_to_bigquery(project_id, dataset_id, table_id, predictions):
+    """
+    Sauvegarde les prédictions dans une table BigQuery.
+    """
+    client = bigquery.Client(project=project_id)
+    table_ref = f"{project_id}.{dataset_id}.{table_id}"
+
+    # Insérer dans BigQuery
+    errors = client.insert_rows_json(table_ref, predictions)
+    if errors:
+        print(f"Erreur lors de l'insertion des prédictions : {errors}")
+    else:
+        print("Prédictions sauvegardées dans BigQuery.")
+
 
 
 if __name__ == "__main__":
