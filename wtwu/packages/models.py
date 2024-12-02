@@ -48,17 +48,19 @@ def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_
         restore_best_weights=True
     )
     model_checkpoint = ModelCheckpoint(
-        save_path,
-        monitor='val_loss',
-        save_best_only=True
-    )
+    filepath="./models/best_model.keras",
+    save_best_only=True,
+    monitor="val_loss",
+    mode="min",
+    verbose=1
+)
 
     # Entraîner le modèle
     history = model.fit(
         X_train, y_train,
         validation_data=(X_val, y_val),
         epochs=epochs,
-        batch_size=min(32, len(y_train) // 10),  # Ajuster selon la taille des données
+        batch_size=min(32, len(y_train) // 10),
         callbacks=[early_stopping, model_checkpoint],
         verbose=1
     )
