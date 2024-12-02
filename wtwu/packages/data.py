@@ -433,6 +433,7 @@ def create_global_dataset(bucket_name, prefix, patients):
     """
     all_time_splits = []
     all_labels = []
+    bucket = client.bucket(bucket_name)
 
     for patient in patients:
         try:
@@ -441,8 +442,8 @@ def create_global_dataset(bucket_name, prefix, patients):
             patient_prefix = f"{prefix}/{patient_id}"
 
             # Charger les fichiers nécessaires depuis GCP
-            time_splits_blob = bucket_name.blob(f"{patient_prefix}/time_splits.npy")
-            y_blob = bucket_name.blob(f"{patient_prefix}/y.txt")
+            time_splits_blob = bucket.blob(f"{patient_prefix}/time_splits.npy")
+            y_blob = bucket.blob(f"{patient_prefix}/y.txt")
 
             time_splits_local = f"./temp/{patient_id}_time_splits.npy"
             y_local = f"./temp/{patient_id}_y.txt"
