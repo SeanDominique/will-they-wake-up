@@ -545,8 +545,9 @@ def create_time_dependent_dataset(bucket_name, prefix, patients, initial_time=0,
             print(f"Erreur pour le patient {patient_id} : {e}")
 
     # Concaténer toutes les données
-    all_time_splits = np.concatenate(all_time_splits, axis=0)
-    all_labels = np.array(all_labels)
+    if len(all_time_splits)>0:
+        all_time_splits = np.concatenate(all_time_splits, axis=0)
+        all_labels = np.array(all_labels)
 
-    print(f"Dataset global créé : {all_time_splits.shape}, {all_labels.shape}")
-    return all_time_splits, all_labels
+        print(f"Dataset global créé : {all_time_splits.shape}, {all_labels.shape}")
+        return all_time_splits, all_labels
