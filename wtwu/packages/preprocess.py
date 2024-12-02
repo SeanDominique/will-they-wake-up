@@ -2,14 +2,14 @@ import os
 
 from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
 
-from wtwu.packages.storage import get_list_of_patients, import_data
 from wtwu.params import *
+from wtwu.packages.storage import get_list_of_patients, import_data
 
 import pandas as pd
 import numpy as np
 import scipy.io
 from scipy.signal import welch, butter, filtfilt
-from mne.filter import resample
+from mne.filter import resample, notch_filter, filter_data
 
 ####################### PREPROCESSING #######################
 
@@ -38,25 +38,58 @@ def preprocess(patients=[]):
 
             if eeg_data_headers != "Error" and len(eeg_data_headers) > 0:
 
+                fs = eeg_data_headers[0]['fs']
+                hours = np.array([header['recording_hour'] for header in eeg_data_headers]).astype(np.float16)
+
                 # Réduction des données
-                    # undersampling of 125Hz and 128Hz (in research paper)
-                reduced_eeg_data = reduce_all_channels(all_eeg_data, target_freq=100, original_freq=fs)
+                    # TODO: try undersampling of 125Hz and 128Hz (in research paper)
+                undersampled_eeg_data = undersample_eegs(all_eeg_data, target_freq=100, original_freq=fs)
 
-                # Waveform segmentation using rolling window
-
-                # Bandpass filter (0.1-45Hz)
+                # Bandpass filter (0.1-40Hz)
+                # `filter_data`` default uses FIR method which is more computationally intensive, but more stable. Using this over butterworth filter, an IIR method, because we are more focused on temporal analysis where phase distortion could be a problem.
+                bandpassed_eeg_data = filter_data(undersampled_eeg_data,
+                                                  sfreq=fs,
+                                                  l_freq=0.01,
+                                                  h_freq=40)
 
                 # Notch filter
+                hospital_location = "US" # TODO: collect EEG recording location from eeg_header
+                if hospital_location == "EU":
+                    notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(50,251,50))
+                elif hospital_location == "US":
+                    notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(60,241,60))
 
-                # standardize (z-score normalization)
+                # Artefact removal
 
                 # clean_data() (AIRhythm -> unified EEG + ECG Channels)
 
                 # calcul des PSD
 
-                # Preprocessing patient data DONE
+                # Epoching
+                # # Fenêtrage et normalisation
+                list_of_splits, list_of_times = wtdata.sample_all(reduced_eeg_data, hours=hours)
+                std = np.std(list_of_splits, axis=0)
+                mean = np.mean(list_of_splits, axis=0)
+                std = np.where(std == 0, 1, std)
+                list_of_splits = (list_of_splits - mean) / std
+                print("print fin prepro")
+
+                # Waveform segmentation using rolling window
+
+                # standardize (z-score normalization)
+
+
+                ### Preprocessing patient data DONE
+
 
                 # upload to relevant GCS bucket
+                    # # Création du dossier local pour le patient
+                    # gcs_file_path =
+                    # os.makedirs(patient_local_path, exist_ok=True)
+
+                    # # Écriture des métadonnées
+                    # with open(f'{patient_local_path}/y.txt', 'a+') as f:
+                    #     f.write(f'survived:{survived}\n')
 
 
             else:
@@ -148,24 +181,11 @@ def recover_eegs_and_hours(patient,scaler='Standard'):
     return EEG_list,hours
 
 
-### Undersampling functions
-def reduce_all_channels(raw_eeg_all_channels, target_freq= 100, original_freq= 500):
-    """
-    Returns a np.array of all a patient's EEG data with only relevant channels.
-    """
-    #rate_of_reduction = np.round(rate_of_reduction)
-
-    raw_eeg_reduced_channels = []
-    for i in range(raw_eeg_all_channels.shape[0]):
-        raw_eeg_reduced_channels.append(reduce_eegs(raw_eeg_all_channels[i,:,:],
-                                              target_freq= target_freq,
-                                              original_freq=original_freq
-                                              ))
-
-    return np.array(raw_eeg_reduced_channels)
-
-def reduce_eegs(list_of_eeg, original_freq= 500, new_freq=100):
+### ✅ Undersampling functions
+def undersample_eegs(list_of_eeg, original_freq= 500, new_freq=100):
     '''
+    Returns a np.array of all a patient's EEG data with only relevant channels.
+
     This function takes a list of EEG spectra, the rate_of_reduction of the frequency
     and the original_frequency, the last two defaulted at 5 and 500.
 
@@ -176,9 +196,9 @@ def reduce_eegs(list_of_eeg, original_freq= 500, new_freq=100):
     trying to create arrays of non-integer sizes.
 
     '''
-    return [resample_eeg_data(eeg, original_freq, new_freq) for eeg in list_of_eeg]
+    return np.array([resample_eeg_data(eeg, original_freq, new_freq) for eeg in list_of_eeg])
 
-def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
+def resample_eeg_data(raw_eeg, original_freq, new_freq, max_seconds=15):
     """
     Resamples raw_eeg_data, array-like of EEG spectra, to compress the data.
 
@@ -192,7 +212,7 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
 
     resampling_ratio = original_freq / new_freq
 
-    undersampled_eeg_data = resample(raw_eeg, down=resampling_ratio)
+    undersampled_eeg_data = resample(raw_eeg, down=resampling_ratio) # uses anti-aliasing
 
     # in case resampled array is too large
     max_samples = max_seconds * new_freq
@@ -206,6 +226,7 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq=100, max_seconds=15):
 
     return undersampled_eeg_data
 
+### ✅ Epoching
 def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=None):
     '''
     This function takes a list of EEGs, their frequency, the sampling rate in seconds
@@ -216,8 +237,17 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
     seconds. If a list of hours was given, it also returns a list of decimal times in hours.
     This list can later be transformed in HH:MM easily, if needed.
 
-    '''
+    Parameters:
+    - list_of_EEGs (np.array): array of all a patient's EEG data
+    - fs (int):                sampling frequency of EEG data (after undersampling in `undersample_eegs`)
+    - sampling_rate (int):
+    - sampling_size (int):     number of seconds the epoch
+    - hours :
 
+    Returns:
+
+
+    '''
 
     splits = []
     split_time = []
@@ -242,6 +272,7 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
     if len(split_time)>0:
         split_time = np.array(split_time)
     return splits, split_time
+
 
 # TODO: Add data.sample_all()
 
@@ -364,17 +395,6 @@ def remove_outliers(eeg_data: np.array):
     """
     Return a numpy array of EEG data without arterfacts.
     """
-
-    # bandpass filter
-    # TODO: parametrize these variables
-    low_freq = 0.01
-    high_freq = 40
-    fs = 100
-    order = 4
-
-    nyq = 0.5*fs
-    normal_cutoff = low_freq / nyq
-    b, a = butter(order, normal_cutoff, btype="lowpass")
 
     # remove artefacts
 
