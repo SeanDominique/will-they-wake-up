@@ -16,3 +16,4 @@ librosa
 google-cloud-bigquery
 matplotlib
 nbformat>=4.2.0
+mne

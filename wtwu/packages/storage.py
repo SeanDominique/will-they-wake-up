@@ -11,9 +11,11 @@
 import os
 from wtwu.params import *
 import re
+import pickle
 
 from google.cloud import storage
 from concurrent.futures import ThreadPoolExecutor
+
 from scipy.io import loadmat
 import numpy as np
 import pandas as pd
@@ -25,6 +27,23 @@ from google.cloud import bigquery
 
 ######## CONSTANTS ########
 CHANNELS = ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3", "P4"] # channels we are interested in
+
+def get_list_of_patients():
+    """
+    Récupère la liste des patients à partir des blobs présents dans le bucket Google Storage.
+    """
+
+    client = storage.Client()
+    blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_DATA_PATH}", delimiter='/')
+
+    # Extraire les ID des patients
+    patient_ids = set()
+    for blob in blobs:
+        path_parts = blob.name.split("/")
+        if len(path_parts) > 2 and path_parts[-2].isnumeric():
+            patient_ids.add(path_parts[-2])
+
+    return sorted(list(patient_ids))
 
 
 def import_data(patient_id: str):
@@ -97,6 +116,7 @@ def import_data(patient_id: str):
                         # remove the last header
                         eeg_data_headers.pop()
 
+            print("data imported and returned")
             return  survived, eeg_data_headers, np.array(all_eeg_data)
 
         except Exception as e :
@@ -118,7 +138,6 @@ def import_data(patient_id: str):
     print("data imported")
 
     return survived, eeg_data_headers, np.array(all_eeg_data)
-
 
 
 # TODO: implement checkpoints to avoid reprocessing in case of failures
@@ -201,20 +220,51 @@ def extract_eeg_data(eeg_file_content, header):
     return eeg_data_arr
 
 
-def upload_processed_data_to_bq():
+
+def upload_preprocessed_data_to_gcs(patient_id: str, patient_info: dict, survived: bool):
     """
-    Upload preprocessed patient data to BQ DB.
+    Upload les fichiers prétraités pour un patient vers le bucket GCP.
+
+    Parameters:
+    - patient_id (str):     id of the patient whose data is being uploaded to GCP [eg. "0284"]
+    - patient_info (dict):  (keys: name of the file, values: arrays of EEG data or dictionary with header data)
+    - survived (bool):      "True" or "False" depending on patient outcome
     """
-    # batch uploads
-    # use BQ's streaming API for low-latency ingestion -> more costly than batch uploads
-    pass
+    # TODO: multi-patient batch uploads
+
+    client = storage.Client()
+    bucket = client.bucket(BUCKET_NAME)
+
+    try:
+        print("Uploading patient {patient} files to GCS.")
+        # save numpy arrays as .npy and
+        for name, info in patient_info.items():
+            blob = bucket.blob(f"{PATIENT_PROCESSED_DATA_PATH}{patient_id}/{name}")
+            buffer = io.BytesIO()
+            if ".pkl" in name:
+                pickle.dump(info, buffer)
+            elif ".npy" in name:
+                np.save(buffer, info)
+            else:
+                print("Unknown filetype given.")
+                return
+            buffer.seek(0)
+            blob.upload_from_file(buffer, content_type="application/octet-stream")
+            print(f"Successfully uploaded patient {patient_id} {name} file to GCS.")
+
+        # save outcome label as .txt
+        blob = bucket.blob(f"{PATIENT_PROCESSED_DATA_PATH}{patient_id}/y.txt")
+        blob.upload_from_string(str(survived))
+        print(f"Successfully uploaded patient {patient_id} y.txt file to GCS.")
+
+    except Exception as e:
+        print(f"Couldn't upload patient {patient_id} files to GCS. \nError: {e}")
+
+    return
 
 
 
 ############### MODEL ###############
-
-
-
 def save_metrics_to_bigquery(project_id, dataset_id, table_id, metrics):
     """
     Sauvegarde les métriques d'entraînement/validation dans une table BigQuery.
