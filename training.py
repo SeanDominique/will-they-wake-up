@@ -1,10 +1,11 @@
-from wtwu.packages.data import create_global_dataset, create_batches, validate_patient_data
+from wtwu.packages.data import create_global_dataset, create_batches, validate_patient_data, create_time_dependent_dataset
 from wtwu.packages.models import create_model, train_model, save_model_local
 from wtwu.packages.storage import save_metrics_to_bigquery
 from wtwu.packages.models import save_metrics_local
 import numpy as np
 from wtwu import params
 import os
+import sys
 
 if __name__ == "__main__":
     # Configurations
@@ -22,9 +23,12 @@ if __name__ == "__main__":
         raise ValueError("Certaines données patient manquent ou sont incomplètes.")
 
     # Étape 2 : Charger les données globales
-    print("Création du dataset global...")
-    all_time_splits, all_labels = create_global_dataset(bucket_name, prefix, patients)
-
+    if len(sys.argv) > 1:
+        print(f"Création d'un dataset avec les entrées entre {int(sys.argv[1])} et {int(sys.argv[1]) + 12} heures.")
+        all_time_splits, all_labels = create_time_dependent_dataset(bucket_name, prefix, patients, int(sys.argv[1]), int(sys.argv[1]+12))
+    else:
+        print("Création du dataset global...")
+        all_time_splits, all_labels = create_global_dataset(bucket_name, prefix, patients)
     # Étape 3 : Créer les batchs
     print("Création des batchs...")
     X_batches, y_batches = create_batches(all_time_splits, all_labels, batch_size)
@@ -45,7 +49,11 @@ if __name__ == "__main__":
     history = train_model(model, X_train, y_train, X_val, y_val)
 
     # Étape 7 : Sauvegarder le modèle localement
-    model_path = save_model_local(model)
+    if len(sys.argv) > 1:
+        model_path = save_model_local(model, time_window= sys.argv[1])
+    else:
+        model_path = save_model_local(model)
+
     print(f"Modèle sauvegardé dans : {model_path}")
 
     # Étape 8 : Collecter et sauvegarder les métriques
@@ -64,7 +72,11 @@ if __name__ == "__main__":
     ]
 
     # Sauvegarder les métriques localement
-    metrics_path = save_metrics_local(metrics)
+    if len(sys.argv) > 1:
+        metrics_path = save_metrics_local(metrics,time_window=int(sys.argv[1]))
+    else:
+        metrics_path = save_metrics_local(metrics)
+
     print(f"Métriques sauvegardées dans : {metrics_path}")
 
     # Optionnel : Sauvegarder les métriques dans BigQuery

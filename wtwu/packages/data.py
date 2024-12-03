@@ -489,7 +489,7 @@ def create_global_dataset(bucket_name, prefix, patients):
 
 def create_time_dependent_dataset(bucket_name, prefix, patients, initial_time=0,end_time=1000):
     """
-    Charge les données `time_splits` et les labels `y` pour tous les patients,
+    Charge les données `time_splits` et les labels `y` pour tous les patients entre deux heures,
     et les concatène en un dataset global.
     """
     all_time_splits = []
@@ -508,11 +508,12 @@ def create_time_dependent_dataset(bucket_name, prefix, patients, initial_time=0,
 
             time_splits_local = f"./temp/{patient_id}_time_splits.npy"
             y_local = f"./temp/{patient_id}_y.txt"
-
+            time_stamps_blob = bucket.blob(f"{patient_prefix}/times.npy")
             time_stamps_local = f"./temp/{patient_id}_times.npy"
 
             time_splits_blob.download_to_filename(time_splits_local)
             y_blob.download_to_filename(y_local)
+            time_stamps_blob.download_to_filename(time_stamps_local)
 
             # Charger les données localement
             time_splits = np.load(time_splits_local)
