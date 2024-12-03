@@ -143,7 +143,7 @@ def evaluate_model(model, X_test, y_test):
     return y_pred, y_pred_prob, accuracy, precision, recall, f1, tpr
 
 
-def save_model_local(model, base_dir="./Metrics_wtwa"):
+def save_model_local(model, base_dir="./Metrics_wtwa", time_window=None):
     """
     Sauvegarde le modèle localement dans un dossier dédié avec un nom incrémenté et une date.
     """
@@ -151,33 +151,56 @@ def save_model_local(model, base_dir="./Metrics_wtwa"):
     os.makedirs(base_dir, exist_ok=True)
 
     # Générer un nom unique basé sur la date et l'incrémentation
-    date_today = datetime.now().strftime("%Y-%m-%d")
-    existing_files = [f for f in os.listdir(base_dir) if f.startswith("model_")]
-    next_index = len(existing_files) + 1
-    save_path = os.path.join(base_dir, f"model_{next_index}_{date_today}.h5")
+    if time_window == None:
+        date_today = datetime.now().strftime("%Y-%m-%d")
+        existing_files = [f for f in os.listdir(base_dir) if f.startswith("model_")]
+        next_index = len(existing_files) + 1
+        save_path = os.path.join(base_dir, f"model_{next_index}_{date_today}.h5")
 
-    # Sauvegarder le modèle
-    model.save(save_path)
-    print(f"Modèle sauvegardé localement dans {save_path}")
-    return save_path
+        # Sauvegarder le modèle
+        model.save(save_path)
+        print(f"Modèle sauvegardé localement dans {save_path}")
+        return save_path
+    else:
+        date_today = datetime.now().strftime("%Y-%m-%d")
+        existing_files = [f for f in os.listdir(base_dir) if f.startswith("model_")]
+        next_index = len(existing_files) + 1
+        save_path = os.path.join(base_dir, f"model_{next_index}_{date_today}_{time_window}_to_{time_window + 12}_hours.h5")
 
+        # Sauvegarder le modèle
+        model.save(save_path)
+        print(f"Modèle sauvegardé localement dans {save_path}")
+        return save_path
 
-def save_metrics_local(metrics, base_dir="./Metrics_wtwa"):
+def save_metrics_local(metrics, base_dir="./Metrics_wtwa", time_window=None):
     """
     Sauvegarde les métriques d'entraînement/validation localement dans un fichier JSON avec un nom unique.
     """
     # Créer le répertoire principal s'il n'existe pas
     os.makedirs(base_dir, exist_ok=True)
+    if time_window == None:
+        # Générer un nom unique basé sur la date et l'incrémentation
+        date_today = datetime.now().strftime("%Y-%m-%d")
+        existing_files = [f for f in os.listdir(base_dir) if f.startswith("metrics_")]
+        next_index = len(existing_files) + 1
+        save_path = os.path.join(base_dir, f"metrics_{next_index}_{date_today}.json")
 
-    # Générer un nom unique basé sur la date et l'incrémentation
-    date_today = datetime.now().strftime("%Y-%m-%d")
-    existing_files = [f for f in os.listdir(base_dir) if f.startswith("metrics_")]
-    next_index = len(existing_files) + 1
-    save_path = os.path.join(base_dir, f"metrics_{next_index}_{date_today}.json")
+        # Sauvegarder les métriques dans un fichier JSON
+        with open(save_path, "w") as f:
+            json.dump(metrics, f, indent=4)
 
-    # Sauvegarder les métriques dans un fichier JSON
-    with open(save_path, "w") as f:
-        json.dump(metrics, f, indent=4)
+        print(f"Métriques sauvegardées localement dans {save_path}")
+        return save_path
+    else:
+        # Générer un nom unique basé sur la date et l'incrémentation
+        date_today = datetime.now().strftime("%Y-%m-%d")
+        existing_files = [f for f in os.listdir(base_dir) if f.startswith("metrics_")]
+        next_index = len(existing_files) + 1
+        save_path = os.path.join(base_dir, f"metrics_{next_index}_{date_today}_{time_window}_to_{time_window + 12}_hours.json")
 
-    print(f"Métriques sauvegardées localement dans {save_path}")
-    return save_path
+        # Sauvegarder les métriques dans un fichier JSON
+        with open(save_path, "w") as f:
+            json.dump(metrics, f, indent=4)
+
+        print(f"Métriques sauvegardées localement dans {save_path}")
+        return save_path
