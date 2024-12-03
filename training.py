@@ -6,7 +6,6 @@ import numpy as np
 from wtwu import params
 import os
 import sys
-if len(sys.argv) > 1:
 
 
 if __name__ == "__main__":
