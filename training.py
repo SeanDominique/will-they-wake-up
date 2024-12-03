@@ -25,7 +25,7 @@ if __name__ == "__main__":
     # Étape 2 : Charger les données globales
     if len(sys.argv) > 1:
         print(f"Création d'un dataset avec les entrées entre {int(sys.argv[1])} et {int(sys.argv[1]) + 12} heures.")
-        all_time_splits, all_labels = create_time_dependent_dataset(bucket_name, prefix, patients, int(sys.argv[1]), int(sys.argv[1]+12))
+        all_time_splits, all_labels = create_time_dependent_dataset(bucket_name, prefix, patients, int(sys.argv[1]), int(sys.argv[1])+12)
     else:
         print("Création du dataset global...")
         all_time_splits, all_labels = create_global_dataset(bucket_name, prefix, patients)
