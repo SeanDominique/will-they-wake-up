@@ -15,6 +15,7 @@ BUCKET_NAME = os.environ.get("BUCKET_NAME")
 DATA_TARGET = os.environ.get("DATA_TARGET")
 MODEL_TARGET = os.environ.get("MODEL_TARGET")
 PATIENT_DATA_PATH = os.environ.get("PATIENT_DATA_PATH")
+PATIENT_PROCESSED_DATA_PATH = os.environ.get("PATIENT_PROCESSED_DATA_PATH")
 
 # GCE (Google Compute Engine)
 VM_INSTANCE = os.environ.get("VM_INSTANCE")
