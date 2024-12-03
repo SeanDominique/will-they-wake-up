@@ -2,6 +2,7 @@ raw_data/
 data/
 test/
 notesbooks/
+temp/
 
 .vscode
 .env

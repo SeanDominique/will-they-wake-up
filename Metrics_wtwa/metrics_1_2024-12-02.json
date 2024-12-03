@@ -1,0 +1,20 @@
+[
+    {
+        "epoch": 1,
+        "batch_size": 19808,
+        "training_loss": 0.6581908464431763,
+        "validation_loss": 0.46688586473464966,
+        "training_accuracy": 0.6236369013786316,
+        "validation_accuracy": 0.96875,
+        "model_path": "./Metrics_wtwa/model_1_2024-12-02.h5"
+    },
+    {
+        "epoch": 2,
+        "batch_size": 19808,
+        "training_loss": 0.630220353603363,
+        "validation_loss": 0.5612112283706665,
+        "training_accuracy": 0.6471627354621887,
+        "validation_accuracy": 0.6875,
+        "model_path": "./Metrics_wtwa/model_1_2024-12-02.h5"
+    }
+]

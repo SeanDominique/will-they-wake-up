@@ -73,6 +73,7 @@ if __name__ == "__main__":
             "validation_loss": history.history['val_loss'][epoch],
             "training_accuracy": history.history['accuracy'][epoch],
             "validation_accuracy": history.history['val_accuracy'][epoch],
+            "recall":history.history['recall'][epoch],
             "model_path": model_path
         }
         for epoch in range(len(history.history['loss']))
