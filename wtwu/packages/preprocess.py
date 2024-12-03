@@ -1,9 +1,7 @@
-import os
-
 from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
 
 from wtwu.params import *
-from wtwu.packages.storage import get_list_of_patients, import_data
+from wtwu.packages.storage import get_list_of_patients, import_data, upload_preprocessed_data_to_gcs
 
 import pandas as pd
 import numpy as np
@@ -41,9 +39,18 @@ def preprocess(patients=[]):
                 fs = eeg_data_headers[0]['fs']
                 hours = np.array([header['recording_hour'] for header in eeg_data_headers]).astype(np.float16)
 
+
                 # Réduction des données
                     # TODO: try undersampling of 125Hz and 128Hz (in research paper)
                 undersampled_eeg_data = undersample_eegs(all_eeg_data, target_freq=100, original_freq=fs)
+
+
+                # Data imputation
+                    # TODO: calculate the number of flatlines + reexplore bad channels through EDA
+
+
+                # Re-reference (mean, local, outter electrode...)
+
 
                 # Bandpass filter (0.1-40Hz)
                 # `filter_data`` default uses FIR method which is more computationally intensive, but more stable. Using this over butterworth filter, an IIR method, because we are more focused on temporal analysis where phase distortion could be a problem.
@@ -52,6 +59,7 @@ def preprocess(patients=[]):
                                                   l_freq=0.01,
                                                   h_freq=40)
 
+
                 # Notch filter
                 hospital_location = "US" # TODO: collect EEG recording location from eeg_header
                 if hospital_location == "EU":
@@ -59,37 +67,52 @@ def preprocess(patients=[]):
                 elif hospital_location == "US":
                     notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(60,241,60))
 
-                # Artefact removal
 
-                # clean_data() (AIRhythm -> unified EEG + ECG Channels)
+                # Artifacts: removal and imputation [advanced]
+
+
+                # ICA
+
 
                 # calcul des PSD
 
+
                 # Epoching
                 # # Fenêtrage et normalisation
-                list_of_splits, list_of_times = wtdata.sample_all(reduced_eeg_data, hours=hours)
-                std = np.std(list_of_splits, axis=0)
-                mean = np.mean(list_of_splits, axis=0)
-                std = np.where(std == 0, 1, std)
-                list_of_splits = (list_of_splits - mean) / std
-                print("print fin prepro")
+                eeg_epochs, split_times = epoch_eeg(notched_eeg_data, hours=hours)
+
+
+                # Artifacts: Remove epochs with artefacts [simplistic]\
+                indeces = []
+                for i, epoch in enumerate(eeg_epochs):
+                    if remove_artifacts(epoch):
+                        indeces.append(i)
+                np.delete(eeg_epochs, indeces)
+
 
                 # Waveform segmentation using rolling window
 
+
                 # standardize (z-score normalization)
+                    # std = np.std(list_of_epochs, axis=0)
+                    # mean = np.mean(list_of_epochs, axis=0)
+                    # std = np.where(std == 0, 1, std)
+                    # list_of_epochs = (list_of_epochs - mean) / std
+                standardized_eeg_epochs = standardize(eeg_epochs)
 
 
                 ### Preprocessing patient data DONE
+                print("Data preprocessing done for patient: {patient}")
 
-
-                # upload to relevant GCS bucket
-                    # # Création du dossier local pour le patient
-                    # gcs_file_path =
-                    # os.makedirs(patient_local_path, exist_ok=True)
-
-                    # # Écriture des métadonnées
-                    # with open(f'{patient_local_path}/y.txt', 'a+') as f:
-                    #     f.write(f'survived:{survived}\n')
+                # upload patient info to relevant GCS bucket
+                patient_info = {
+                    # "PSDs.npy": list_of_psds,
+                    # "PSDs_fs.npy": psds_fs,
+                    "time_splits.npy": standardized_eeg_epochs,
+                    "times.npy": split_times,
+                    "header.pkl": eeg_data_headers
+                }
+                upload_preprocessed_data_to_gcs(patient, patient_info, survived)
 
 
             else:
@@ -110,76 +133,7 @@ def preprocess(patients=[]):
 
     return
 
-
-####################### ECHANTILLONAGE #######################
-file_path = '/home/mariorocha/code/SeanDominique/will-they-wake-up/data/raw/physionet.org/files/i-care/2.1/training/0284/'
-
-##TODO Change the path using os, if possible making the patient a variable.
-def get_eeg_paths(directory):
-    '''
-    This function gets all the EEG file paths from a directory input, sorted over time.
-    '''
-
-    eeg_files = []
-
-    for root, _, files in os.walk(directory):
-
-        for file in files:
-
-            if file.endswith("EEG.mat"):
-
-                absolute_path = os.path.abspath(os.path.join(root, file))
-                eeg_files.append(absolute_path)
-
-    return sorted(eeg_files)
-
-def recover_eegs_and_hours(patient,scaler='Standard'):
-    '''
-    This function gets extracts all EEGs from a list of file paths (patient input) and puts it in a list.
-    It also gives a list of all the 'Hours after cardiac arrest' per file on a separate list.
-    It would be better if we could just put the patient number - TODO
-
-
-    It takes as scaler the following: 'Standard', 'MinMax' or 'Robust'.
-    The default value is 'Standard'.
-
-    If you think the last files of the directory are corrupted (or not completely downloaded yet)
-    use the argument 'stop_before' = number of files to skip in the end.
-
-    There's a commented line if we want to do the mean of all channels.
-
-    '''
-
-    EEG_file_list = get_eeg_paths(patient)
-    hours =[]
-
-    if scaler == 'MinMax':
-        scaler = MinMaxScaler()
-    if scaler == 'Standard':
-        scaler = StandardScaler()
-    if scaler == 'Robust':
-        scaler = RobustScaler()
-
-    EEG_list = []
-    for file_path in EEG_file_list[1:-1]:
-        eeg = scipy.io.loadmat(file_path)
-        eeg = eeg['val']
-        eeg = eeg.astype(float)
-        #for line in eeg:
-        #    temp_line = line.reshape(1, -1)
-        #    temp_line = scaler.fit_transform(temp_line)
-        #    line = temp_line.reshape(-1)
-        # eeg = np.mean(eeg,axis=0)
-        EEG_list.append(eeg)
-        EEG_list = np.array(EEG_list)
-        hour = file_path[-11:-8]
-        hours.append(hour)
-
-    hours = np.array(hours)
-    hours = np.reshape(1,-1)
-
-    return EEG_list,hours
-
+############ Preprocessing helper functions ############
 
 ### ✅ Undersampling functions
 def undersample_eegs(list_of_eeg, original_freq= 500, new_freq=100):
@@ -227,11 +181,12 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq, max_seconds=15):
     return undersampled_eeg_data
 
 ### ✅ Epoching
-def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hours=None):
+def sampling_EEGs(arr_of_eegs, fs=100, sampling_rate=600, sampling_size=15, hours=None):
     '''
-    This function takes a list of EEGs, their frequency, the sampling rate in seconds
-    (every 10 min = 600), the sampling size in seconds, and if available, the list of
-    hours after cardiac arrest.
+    This function takes a numpy array of numpy arrays containing a patient's EEG data for each 1h of recording.
+
+    It also takes their frequency, the sampling rate in seconds (every 10 min = 600), the sampling size in seconds,
+    and if available, the list of hours after cardiac arrest.
 
     It returns splits of the EEGs every (sampling_rate) seconds of length (sampling_size)
     seconds. If a list of hours was given, it also returns a list of decimal times in hours.
@@ -240,42 +195,59 @@ def sampling_EEGs(list_of_EEGs, fs=100, sampling_rate=600, sampling_size=15,hour
     Parameters:
     - list_of_EEGs (np.array): array of all a patient's EEG data
     - fs (int):                sampling frequency of EEG data (after undersampling in `undersample_eegs`)
-    - sampling_rate (int):
-    - sampling_size (int):     number of seconds the epoch
+    - sampling_rate (int):     the interval, in seconds, at which to take the epochs
+    - sampling_size (int):     number of seconds for the epoch
     - hours :
 
     Returns:
-
-
+    - eeg_epochs (np.array): array of EEG epochs (shape: (sampling_size * fs,))
+    - time_splits (np.array):
     '''
 
-    splits = []
-    split_time = []
-    i_EEG = 0
+    # TODO: use mne.make_fixed_length_epochs, note: takes `Raw` object instead of array-like signal
 
-    for EEG in list_of_EEGs:
+    eeg_epochs = []
+    split_time = []
+
+    for i_eeg, eeg in enumerate(arr_of_eegs):
 
         i = 0
-        while ((sampling_rate*i) + sampling_size)*fs < len(EEG):
-
-            splits.append(EEG[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
+        while ((sampling_rate*i) + sampling_size)*fs < len(eeg):
+            eeg_epochs.append(eeg[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
 
             if hours != None:
-
-                split_time.append(float(hours[i_EEG])+((fs/sampling_rate)*i))
+                split_time.append(float(hours[i_eeg])+((fs/sampling_rate)*i))
 
             i += 1
 
-        i_EEG += 1
-
-    splits = np.array(splits)
     if len(split_time)>0:
         split_time = np.array(split_time)
-    return splits, split_time
 
+    return np.array(eeg_epochs), split_time
 
-# TODO: Add data.sample_all()
+def epoch_eeg(arr_reduced_eeg, fs=100, sampling_rate=600, sampling_size=15,hours=None):
+    '''Does the sampling in all channels and all times'''
 
+    eeg_epochs = []
+    split_times = []
+
+    for i in range(arr_reduced_eeg.shape[0]):
+        epochs, split_time = sampling_EEGs(arr_reduced_eeg[i,:,:], hours=hours)
+        eeg_epochs.append(epochs)
+        split_times.append(split_time)
+
+    eeg_epochs = np.array(eeg_epochs)
+    eeg_epochs = eeg_epochs.reshape(int(eeg_epochs.shape[0]),8,int(eeg_epochs.shape[1]/8),int(eeg_epochs.shape[2]))
+    eeg_epochs = np.transpose(eeg_epochs,axes=(0,2,3,1))
+    eeg_epochs = eeg_epochs.reshape(eeg_epochs.shape[0]*eeg_epochs.shape[1],eeg_epochs.shape[2],eeg_epochs.shape[3])
+
+    if len(split_times)>0:
+        split_times = np.array(split_times)
+        split_times = split_times[0,:]
+
+    return eeg_epochs, split_times
+
+### PSDS, frequency domain
 def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
     '''
     This function takes an array of EEGs and returns the PSDs.
@@ -338,20 +310,7 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
         print('get_psds: bad input type')
         return None
 
-
-####################### CLEANING THE DATA #######################
-def clean_data():
-    # TODO: make sure column names are
-
-    # make sure everything is in the right shape
-
-    # deal with different frequencies based on hospitals
-
-    # get the right channels
-
-    pass
-
-
+### ✅ Data manipulation
 def standardize(eeg_data: np.array, scaler="standard") -> np.array:
     """
     Return a numpy array with the standardized EEG data based on the given scaler
@@ -376,10 +335,12 @@ def impute():
     pass
 
 def remove_channels():
+    # look into MNE raw["bads"] -> how do they determine bad channels?
     pass
 
 
 def padding():
+    # unnecessary considering current model (LSTM) input shape
     pass
 
 
@@ -391,17 +352,76 @@ def resampling():
     # mneresample()
     pass
 
-def remove_outliers(eeg_data: np.array):
+def remove_artifacts(eeg_epoch: np.array, threshold=100):
     """
-    Return a numpy array of EEG data without arterfacts.
-    """
+    [Simplistic approach]
+    Evaluates if an eeg_epoch contains artefacts.
 
-    # remove artefacts
+    [Further development]
+    Return a numpy array of EEG data without artifacts.
 
-    # from MNE docu: frequency-restricted artifacts are slow drifts and power line noise
+    From MNE doc, frequency-restricted artifacts are slow drifts and power line noise
     # power line noise -> notch filter
+    # slow-drift -> # TODO: requires EDA
+    """
+
+    # remove ECG signal
+        # TODO: import ECG signals from GCS and use in preprocessing step
+
+    # remove excessively high amplitude signals
 
     # slow-drift
+
+    return (np.max(np.abs(eeg_epoch)) > threshold)
+
+
+####################### Unknown #######################
+def recover_eegs_and_hours(patient,scaler='Standard'):
+    '''
+    This function gets extracts all EEGs from a list of file paths (patient input) and puts it in a list.
+    It also gives a list of all the 'Hours after cardiac arrest' per file on a separate list.
+    It would be better if we could just put the patient number - TODO
+
+
+    It takes as scaler the following: 'Standard', 'MinMax' or 'Robust'.
+    The default value is 'Standard'.
+
+    If you think the last files of the directory are corrupted (or not completely downloaded yet)
+    use the argument 'stop_before' = number of files to skip in the end.
+
+    There's a commented line if we want to do the mean of all channels.
+
+    '''
+
+    EEG_file_list = get_eeg_paths(patient)
+    hours =[]
+
+    if scaler == 'MinMax':
+        scaler = MinMaxScaler()
+    if scaler == 'Standard':
+        scaler = StandardScaler()
+    if scaler == 'Robust':
+        scaler = RobustScaler()
+
+    EEG_list = []
+    for file_path in EEG_file_list[1:-1]:
+        eeg = scipy.io.loadmat(file_path)
+        eeg = eeg['val']
+        eeg = eeg.astype(float)
+        #for line in eeg:
+        #    temp_line = line.reshape(1, -1)
+        #    temp_line = scaler.fit_transform(temp_line)
+        #    line = temp_line.reshape(-1)
+        # eeg = np.mean(eeg,axis=0)
+        EEG_list.append(eeg)
+        EEG_list = np.array(EEG_list)
+        hour = file_path[-11:-8]
+        hours.append(hour)
+
+    hours = np.array(hours)
+    hours = np.reshape(1,-1)
+
+    return EEG_list,hours
 
 
 
