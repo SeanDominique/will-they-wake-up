@@ -1,22 +1,18 @@
-from wtwu.storage import *
+from wtwu.packages.storage import *
+from wtwu.packages.preprocess import preprocess
+from wtwu.packages.model import *
 
-from wtwu.packages.preprocess import *
-
-from wtwu.model import *
-
-
-
-def get_data_from_GCS():
-    # storage
-    pass
-
-def preprocess():
-    # preprocess
-
-    clean_data()
+import numpy as np
+from google.cloud import storage
 
 
-    pass
+
+def preproc(patients: list):
+    """
+    Patients can be an empty list. If the case, will fetch the entire patient list from GCS.
+    """
+    preprocess(patients)
+    return
 
 
 def train(input_shape, model, ):
