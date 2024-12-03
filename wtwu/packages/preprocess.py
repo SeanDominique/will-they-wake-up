@@ -17,12 +17,6 @@ def preprocess(patients=[]):
     Cette fonction suppose que la donnée des patients est en local ou déja sur GCS.
     """
 
-    # BUCKET_NAME =
-    # PATIENT_DATA_PATH -> "i-care-2.0.physionet.org/training/"
-    # local_processed_path -> destination
-    # preprocessed_path -> GCS path for processed data
-
-
     # get patient data from GCS
     if DATA_TARGET == "gcs":
         if len(patients) == 0:
@@ -45,10 +39,6 @@ def preprocess(patients=[]):
                 undersampled_eeg_data = undersample_eegs(all_eeg_data, target_freq=100, original_freq=fs)
 
 
-                # Data imputation
-                    # TODO: calculate the number of flatlines + reexplore bad channels through EDA
-
-
                 # Re-reference (mean, local, outter electrode...)
 
 
@@ -61,21 +51,15 @@ def preprocess(patients=[]):
 
 
                 # Notch filter
-                hospital_location = "US" # TODO: collect EEG recording location from eeg_header
-                if hospital_location == "EU":
-                    notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(50,251,50))
-                elif hospital_location == "US":
-                    notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(60,241,60))
-
+                utility_freq = eeg_data_headers[0]['Utility frequency'] # TODO: collect EEG recording location from eeg_header
+                notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(utility_freq,
+                                                                                   5*utility_freq+1,
+                                                                                   utility_freq))
 
                 # Artifacts: removal and imputation [advanced]
 
 
                 # ICA
-
-
-                # calcul des PSD
-
 
                 # Epoching
                 # # Fenêtrage et normalisation
@@ -90,6 +74,10 @@ def preprocess(patients=[]):
                 np.delete(eeg_epochs, indeces)
 
 
+                # Data imputation
+                    # TODO: calculate the number of flatlines + reexplore bad channels through EDA
+
+
                 # Waveform segmentation using rolling window
 
 
@@ -99,6 +87,9 @@ def preprocess(patients=[]):
                     # std = np.where(std == 0, 1, std)
                     # list_of_epochs = (list_of_epochs - mean) / std
                 standardized_eeg_epochs = standardize(eeg_epochs)
+
+                 # calcul des PSD
+                    # for feature engineering or other models
 
 
                 ### Preprocessing patient data DONE
@@ -176,12 +167,11 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq, max_seconds=15):
         print(f'Data points lost: {remaining}')
 
     print(f'EEG reduced to a {original_freq/resampling_ratio} Hz frequence.')
-    # EEG.reshape(-1, int(resampling_ratio) ).mean(axis=1) --> TODO: Why?
 
     return undersampled_eeg_data
 
 ### ✅ Epoching
-def sampling_EEGs(arr_of_eegs, fs=100, sampling_rate=600, sampling_size=15, hours=None):
+def sampling_EEGs(arr_of_eegs, fs=100, sampling_rate=600, sampling_size=15, hours=np.zeros((10000,))):
     '''
     This function takes a numpy array of numpy arrays containing a patient's EEG data for each 1h of recording.
 
@@ -215,10 +205,15 @@ def sampling_EEGs(arr_of_eegs, fs=100, sampling_rate=600, sampling_size=15, hour
         while ((sampling_rate*i) + sampling_size)*fs < len(eeg):
             eeg_epochs.append(eeg[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
 
-            if hours != None:
+            # to check if `hours` corresponds to an actual list of hours
+            if hours.shape != (10000,):
                 split_time.append(float(hours[i_eeg])+((fs/sampling_rate)*i))
 
+                # 0/6 -> 1/6 -> 2/6, 5/6
+                split_time.append((hours)+((fs/sampling_rate)*i))
             i += 1
+
+    eeg_epochs = np.array(eeg_epochs)
 
     if len(split_time)>0:
         split_time = np.array(split_time)
@@ -226,50 +221,48 @@ def sampling_EEGs(arr_of_eegs, fs=100, sampling_rate=600, sampling_size=15, hour
     return np.array(eeg_epochs), split_time
 
 def epoch_eeg(arr_reduced_eeg, fs=100, sampling_rate=600, sampling_size=15,hours=None):
-    '''Does the sampling in all channels and all times'''
+    '''
+    Does the sampling in all channels and all times
+    undersampled EEG data -> 15s epochs
+    TODO: rewrite this function doc
+    '''
 
     eeg_epochs = []
     split_times = []
 
     for i in range(arr_reduced_eeg.shape[0]):
-        epochs, split_time = sampling_EEGs(arr_reduced_eeg[i,:,:], hours=hours)
-        eeg_epochs.append(epochs)
-        split_times.append(split_time)
+        epochs, split_time = sampling_EEGs(arr_reduced_eeg[i,:,:], hours=hours[i])
 
+        eeg_epochs.append(epochs)
+
+        # to avoid copying split_time 6 times per EEG 1h recording
+        split_times.append(split_time[:int(sampling_rate/fs)])
+
+    # reshape epochs for model input_shape
     eeg_epochs = np.array(eeg_epochs)
     eeg_epochs = eeg_epochs.reshape(int(eeg_epochs.shape[0]),8,int(eeg_epochs.shape[1]/8),int(eeg_epochs.shape[2]))
     eeg_epochs = np.transpose(eeg_epochs,axes=(0,2,3,1))
     eeg_epochs = eeg_epochs.reshape(eeg_epochs.shape[0]*eeg_epochs.shape[1],eeg_epochs.shape[2],eeg_epochs.shape[3])
 
     if len(split_times)>0:
-        split_times = np.array(split_times)
-        split_times = split_times[0,:]
+        split_times = np.concatenate(split_times)
+        # split_times = np.array(split_times)
+        # split_times = split_times[0,:]
 
     return eeg_epochs, split_times
 
 ### PSDS, frequency domain
-def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
+def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input_type='array'):
     '''
-    This function takes an array of EEGs and returns the PSDs.
+    This function takes an array or list of EEGs and returns the PSDs.
     It can have two modes: 'channels' or 'time':
-
     On 'channels' mode, it will return a PSD for each channel
     if given a list of EEGs of a single patient from a single raw file.
-
     On 'time' mode, it will take as input a list containing EEGs of a single
     channel or an average of a single patient and return a dataframe containing
     all PSDs as columns and their 'hours after cardiac arrest' as index.
-
     input_type = ['list' ,'array']
-
-
     '''
-
-    if hours != None:
-
-
-        hours_df = pd.DataFrame(hours,columns='time')
-
     if input_type == 'list':
         psds = []
         for eeg in EEG_list:
@@ -277,38 +270,42 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=None,input_type='list'):
             psds.append(temp_psd)
         psds_df = pd.DataFrame(psds)
         if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
-            psds_df = pd.concat([psds_df, hours_df], axis=1)
+            psds_df = pd.concat([psds_df, hours], axis=1)
             psds_df = psds_df.groupby(by='hours',as_index=True).mean()
-            return psds_df, f
+            return f, psds_df
         elif mode == 'time':
-            return psds_df, f
+            return f, psds_df
         elif mode == 'channels':
-            return psds, f
+            return f, psds_df
         else:
             print('get_psds: unrecognised mode.')
             return None
-
     if input_type == 'array':
-        psds_ar = np.zeros([EEG_list.shape[1],np.ceil(fs/2)])
-        for i in range(EEG_list.shape[1]):
-            f, psds_ar[i,:] = welch(psds[i,:], fs=fs, nperseg=1024)
-        psds_df = pd.DataFrame(psds_ar)
-
-        if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
-            psds_df = pd.concat([psds_df, hours_df], axis=1)
-            psds_df = psds_df.groupby(by='hours',as_index=True).mean()
-            return psds_df, f
-        elif mode == 'time':
-            return psds_df, f
+        psds = []
+        for i in range(0, EEG_list.shape[0]):
+            psds1 = []
+            for j in range(0, EEG_list.shape[2]):
+                f, psds_temp = welch(EEG_list[i,:,j], fs=fs, nperseg=4*fs)
+                psds1.append(psds_temp)
+            psds.append(psds1)
+        psds_ar = np.array(psds)
+        psds_ar = np.transpose(psds_ar, axes=(0,2,1))
+        if mode == 'time':
+            psds_df = pd.DataFrame(psds_ar)
+            if hours.shape[0] == psds_ar.shape[1]:
+                psds_df = pd.concat([psds_df, hours], axis=1)
+                psds_df = psds_df.groupby(by='hours',as_index=True).mean()
+                return f, psds_df
+            return f, psds_df
         elif mode == 'channels':
-            return psds_ar, f
+            return f, psds_ar
         else:
             print('get_psds: unrecognised mode.')
             return None
-
     else:
         print('get_psds: bad input type')
         return None
+
 
 ### ✅ Data manipulation
 def standardize(eeg_data: np.array, scaler="standard") -> np.array:
@@ -335,22 +332,14 @@ def impute():
     pass
 
 def remove_channels():
+    # TODO: note: we only collect relevant channels in `import_data`
     # look into MNE raw["bads"] -> how do they determine bad channels?
     pass
-
 
 def padding():
     # unnecessary considering current model (LSTM) input shape
     pass
 
-
-def resampling():
-    # Mario's code optimized with MNE
-
-    # epoch the data before resampling otherwise
-
-    # mneresample()
-    pass
 
 def remove_artifacts(eeg_epoch: np.array, threshold=100):
     """
@@ -373,56 +362,6 @@ def remove_artifacts(eeg_epoch: np.array, threshold=100):
     # slow-drift
 
     return (np.max(np.abs(eeg_epoch)) > threshold)
-
-
-####################### Unknown #######################
-def recover_eegs_and_hours(patient,scaler='Standard'):
-    '''
-    This function gets extracts all EEGs from a list of file paths (patient input) and puts it in a list.
-    It also gives a list of all the 'Hours after cardiac arrest' per file on a separate list.
-    It would be better if we could just put the patient number - TODO
-
-
-    It takes as scaler the following: 'Standard', 'MinMax' or 'Robust'.
-    The default value is 'Standard'.
-
-    If you think the last files of the directory are corrupted (or not completely downloaded yet)
-    use the argument 'stop_before' = number of files to skip in the end.
-
-    There's a commented line if we want to do the mean of all channels.
-
-    '''
-
-    EEG_file_list = get_eeg_paths(patient)
-    hours =[]
-
-    if scaler == 'MinMax':
-        scaler = MinMaxScaler()
-    if scaler == 'Standard':
-        scaler = StandardScaler()
-    if scaler == 'Robust':
-        scaler = RobustScaler()
-
-    EEG_list = []
-    for file_path in EEG_file_list[1:-1]:
-        eeg = scipy.io.loadmat(file_path)
-        eeg = eeg['val']
-        eeg = eeg.astype(float)
-        #for line in eeg:
-        #    temp_line = line.reshape(1, -1)
-        #    temp_line = scaler.fit_transform(temp_line)
-        #    line = temp_line.reshape(-1)
-        # eeg = np.mean(eeg,axis=0)
-        EEG_list.append(eeg)
-        EEG_list = np.array(EEG_list)
-        hour = file_path[-11:-8]
-        hours.append(hour)
-
-    hours = np.array(hours)
-    hours = np.reshape(1,-1)
-
-    return EEG_list,hours
-
 
 
 if "__main__" == __name__:
