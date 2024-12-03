@@ -6,6 +6,8 @@ import numpy as np
 from wtwu import params
 import os
 import sys
+if len(sys.argv) > 1:
+
 
 if __name__ == "__main__":
     # Configurations
@@ -16,7 +18,12 @@ if __name__ == "__main__":
     batch_size = 32
     patients = [str(i) for i in range(284, 385)]  # Liste des patients (à ajuster selon vos données)
 
+
     print("Current working directory:", os.getcwd())
+
+    if len(sys.argv) > 1:
+
+        init_time = int(sys.argv[1])
 
     # Étape 1 : Valider les données
     if not validate_patient_data(bucket_name, prefix, patients):
@@ -24,7 +31,7 @@ if __name__ == "__main__":
 
     # Étape 2 : Charger les données globales
     if len(sys.argv) > 1:
-        print(f"Création d'un dataset avec les entrées entre {int(sys.argv[1])} et {int(sys.argv[1]) + 12} heures.")
+        print(f"Création d'un dataset avec les entrées entre {init_time} et {init_time + 12} heures.")
         all_time_splits, all_labels = create_time_dependent_dataset(bucket_name, prefix, patients, int(sys.argv[1]), int(sys.argv[1])+12)
     else:
         print("Création du dataset global...")
@@ -50,7 +57,7 @@ if __name__ == "__main__":
 
     # Étape 7 : Sauvegarder le modèle localement
     if len(sys.argv) > 1:
-        model_path = save_model_local(model, time_window= sys.argv[1])
+        model_path = save_model_local(model, time_window=init_time)
     else:
         model_path = save_model_local(model)
 
@@ -73,7 +80,7 @@ if __name__ == "__main__":
 
     # Sauvegarder les métriques localement
     if len(sys.argv) > 1:
-        metrics_path = save_metrics_local(metrics,time_window=int(sys.argv[1]))
+        metrics_path = save_metrics_local(metrics,time_window=init_time)
     else:
         metrics_path = save_metrics_local(metrics)
 
