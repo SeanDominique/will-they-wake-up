@@ -15,7 +15,7 @@ if __name__ == "__main__":
     bucket_name = params.BUCKET_NAME
     prefix = "preprocessed"
     batch_size = 32
-    patients = [str(i) for i in range(284, 385)]  # Liste des patients (à ajuster selon vos données)
+    patients = [str(i) for i in range(284, 702)]  # Liste des patients (à ajuster selon vos données)
 
 
     print("Current working directory:", os.getcwd())
@@ -23,6 +23,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
 
         init_time = int(sys.argv[1])
+        window_size = 24
 
     # Étape 1 : Valider les données
     if not validate_patient_data(bucket_name, prefix, patients):
@@ -30,8 +31,8 @@ if __name__ == "__main__":
 
     # Étape 2 : Charger les données globales
     if len(sys.argv) > 1:
-        print(f"Création d'un dataset avec les entrées entre {init_time} et {init_time + 12} heures.")
-        all_time_splits, all_labels = create_time_dependent_dataset(bucket_name, prefix, patients, int(sys.argv[1]), int(sys.argv[1])+12)
+        print(f"Création d'un dataset avec les entrées entre {init_time} et {init_time + window_size} heures.")
+        all_time_splits, all_labels = create_time_dependent_dataset(bucket_name, prefix, patients, init_time, init_time+window_size)
     else:
         print("Création du dataset global...")
         all_time_splits, all_labels = create_global_dataset(bucket_name, prefix, patients)
@@ -56,7 +57,7 @@ if __name__ == "__main__":
 
     # Étape 7 : Sauvegarder le modèle localement
     if len(sys.argv) > 1:
-        model_path = save_model_local(model, time_window=init_time)
+        model_path = save_model_local(model, time_window=init_time,window_size = window_size)
     else:
         model_path = save_model_local(model)
 
@@ -79,7 +80,7 @@ if __name__ == "__main__":
 
     # Sauvegarder les métriques localement
     if len(sys.argv) > 1:
-        metrics_path = save_metrics_local(metrics,time_window=init_time)
+        metrics_path = save_metrics_local(metrics,time_window=init_time,window_size = window_size)
     else:
         metrics_path = save_metrics_local(metrics)
 

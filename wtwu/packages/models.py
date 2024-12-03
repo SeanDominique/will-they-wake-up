@@ -143,7 +143,7 @@ def evaluate_model(model, X_test, y_test):
     return y_pred, y_pred_prob, accuracy, precision, recall, f1, tpr
 
 
-def save_model_local(model, base_dir="./Metrics_wtwa", time_window=None):
+def save_model_local(model, base_dir="./Metrics_wtwa", time_window=None,window_size = 24):
     """
     Sauvegarde le modèle localement dans un dossier dédié avec un nom incrémenté et une date.
     """
@@ -165,14 +165,14 @@ def save_model_local(model, base_dir="./Metrics_wtwa", time_window=None):
         date_today = datetime.now().strftime("%Y-%m-%d")
         existing_files = [f for f in os.listdir(base_dir) if f.startswith("model_")]
         next_index = len(existing_files) + 1
-        save_path = os.path.join(base_dir, f"model_{next_index}_{date_today}_{time_window}_to_{time_window + 12}_hours.h5")
+        save_path = os.path.join(base_dir, f"model_{next_index}_{date_today}_{time_window}_to_{time_window + window_size}_hours.h5")
 
         # Sauvegarder le modèle
         model.save(save_path)
         print(f"Modèle sauvegardé localement dans {save_path}")
         return save_path
 
-def save_metrics_local(metrics, base_dir="./Metrics_wtwa", time_window=None):
+def save_metrics_local(metrics, base_dir="./Metrics_wtwa", time_window=None, window_size=24):
     """
     Sauvegarde les métriques d'entraînement/validation localement dans un fichier JSON avec un nom unique.
     """
@@ -196,7 +196,7 @@ def save_metrics_local(metrics, base_dir="./Metrics_wtwa", time_window=None):
         date_today = datetime.now().strftime("%Y-%m-%d")
         existing_files = [f for f in os.listdir(base_dir) if f.startswith("metrics_")]
         next_index = len(existing_files) + 1
-        save_path = os.path.join(base_dir, f"metrics_{next_index}_{date_today}_{time_window}_to_{time_window + 12}_hours.json")
+        save_path = os.path.join(base_dir, f"metrics_{next_index}_{date_today}_{time_window}_to_{time_window + window_size}_hours.json")
 
         # Sauvegarder les métriques dans un fichier JSON
         with open(save_path, "w") as f:
