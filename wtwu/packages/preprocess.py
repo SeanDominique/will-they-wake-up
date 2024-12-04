@@ -17,111 +17,115 @@ def preprocess(patients=[]):
     Cette fonction suppose que la donnée des patients est en local ou déja sur GCS.
     """
 
-    # get patient data from GCS
-    if DATA_TARGET == "gcs":
-        if len(patients) == 0:
-            patients = get_list_of_patients()
+    try:
+        # get patient data from GCS
+        if DATA_TARGET == "gcs":
+            if len(patients) == 0:
+                patients = get_list_of_patients()
 
-        for patient in patients:
-            print(f"Traitement du patient {patient}...")
+            for patient in patients:
+                print(f"Traitement du patient {patient}...")
 
-            # Import des données
-            survived, eeg_data_headers, all_eeg_data = import_data(patient)
+                # Import des données
+                survived, eeg_data_headers, all_eeg_data = import_data(patient)
 
-            if eeg_data_headers != "Error" and len(eeg_data_headers) > 0:
+                if eeg_data_headers != "Error" and len(eeg_data_headers) > 0:
 
-                fs = eeg_data_headers[0]['fs']
-                hours = np.array([header['recording_hour'] for header in eeg_data_headers]).astype(np.float16)
-
-
-                # Réduction des données
-                    # TODO: try undersampling of 125Hz and 128Hz (in research paper)
-                undersampled_eeg_data = undersample_eegs(all_eeg_data, target_freq=100, original_freq=fs)
+                    fs = eeg_data_headers[0]['fs']
+                    hours = np.array([header['recording_hour'] for header in eeg_data_headers]).astype(np.float16)
 
 
-                # Re-reference (mean, local, outter electrode...)
+                    # Réduction des données
+                        # TODO: try undersampling of 125Hz and 128Hz (in research paper)
+                    undersampled_eeg_data = undersample_eegs(all_eeg_data, target_freq=100, original_freq=fs)
 
 
-                # Bandpass filter (0.1-40Hz)
-                # `filter_data`` default uses FIR method which is more computationally intensive, but more stable. Using this over butterworth filter, an IIR method, because we are more focused on temporal analysis where phase distortion could be a problem.
-                bandpassed_eeg_data = filter_data(undersampled_eeg_data,
-                                                  sfreq=fs,
-                                                  l_freq=0.01,
-                                                  h_freq=40)
+                    # Re-reference (mean, local, outter electrode...)
 
 
-                # Notch filter
-                utility_freq = eeg_data_headers[0]['Utility frequency'] # TODO: collect EEG recording location from eeg_header
-                notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(utility_freq,
-                                                                                   5*utility_freq+1,
-                                                                                   utility_freq))
-
-                # Artifacts: removal and imputation [advanced]
-
-
-                # ICA
-
-                # Epoching
-                # # Fenêtrage et normalisation
-                eeg_epochs, split_times = epoch_eeg(notched_eeg_data, hours=hours)
+                    # Bandpass filter (0.1-40Hz)
+                    # `filter_data`` default uses FIR method which is more computationally intensive, but more stable. Using this over butterworth filter, an IIR method, because we are more focused on temporal analysis where phase distortion could be a problem.
+                    bandpassed_eeg_data = filter_data(undersampled_eeg_data,
+                                                    sfreq=fs,
+                                                    l_freq=0.01,
+                                                    h_freq=40)
 
 
-                # Artifacts: Remove epochs with artefacts [simplistic]\
-                indeces = []
-                for i, epoch in enumerate(eeg_epochs):
-                    if remove_artifacts(epoch):
-                        indeces.append(i)
-                np.delete(eeg_epochs, indeces)
+                    # Notch filter
+                    utility_freq = eeg_data_headers[0]['Utility frequency'] # TODO: collect EEG recording location from eeg_header
+                    notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(utility_freq,
+                                                                                    5*utility_freq+1,
+                                                                                    utility_freq))
+
+                    # Artifacts: removal and imputation [advanced]
 
 
-                # Data imputation
-                    # TODO: calculate the number of flatlines + reexplore bad channels through EDA
+                    # ICA
+
+                    # Epoching
+                    # # Fenêtrage et normalisation
+                    eeg_epochs, split_times = epoch_eeg(notched_eeg_data, hours=hours)
 
 
-                # Waveform segmentation using rolling window
+                    # Artifacts: Remove epochs with artefacts [simplistic]\
+                    indeces = []
+                    for i, epoch in enumerate(eeg_epochs):
+                        if remove_artifacts(epoch):
+                            indeces.append(i)
+                    np.delete(eeg_epochs, indeces)
 
 
-                # standardize (z-score normalization)
-                standardized_eeg_epochs = standardize(eeg_epochs)
+                    # Data imputation
+                        # TODO: calculate the number of flatlines + reexplore bad channels through EDA
 
-                 # calcul des PSD
-                    # for feature engineering or other models
-                psd_list = []
-                f_list = []
-                for eeg in standardized_eeg_epochs:
-                    f, psd = get_psds(eeg)
-                    psd_list.append(psd)
-                    f_list.append(f)
 
-                ### Preprocessing patient data DONE
-                print("Data preprocessing done for patient: {patient}")
+                    # Waveform segmentation using rolling window
 
-                # upload patient info to relevant GCS bucket
-                patient_info = {
-                    "PSDs.npy": psd_list,
-                    "PSDs_fs.npy": f_list,
-                    "time_splits.npy": standardized_eeg_epochs,
-                    "times.npy": split_times,
-                    "header.pkl": eeg_data_headers
-                }
-                upload_preprocessed_data_to_gcs(patient, patient_info, survived)
 
+                    # standardize (z-score normalization)
+                    standardized_eeg_epochs = standardize(eeg_epochs)
+
+                    # calcul des PSD
+                        # for feature engineering or other models
+                    psds_list = []
+                    f_list = []
+                    for eeg in standardized_eeg_epochs:
+                        f, psd = get_psds(eeg)
+                        f_list.append(f)
+                        psds_list.append(psd)
+
+                    ### Preprocessing patient data DONE
+                    print("Data preprocessing done for patient: {patient}")
+
+                    # upload patient info to relevant GCS bucket
+                    patient_info = {
+                        "PSDs.npy": psds_list,
+                        "PSDs_fs.npy": f_list,
+                        "time_splits.npy": standardized_eeg_epochs,
+                        "times.npy": split_times,
+                        "header.pkl": eeg_data_headers
+                    }
+                    upload_preprocessed_data_to_gcs(patient, patient_info, survived)
+
+
+                else:
+                    print(f"Patient {patient} : Données introuvables ou incorrectes.")
 
             else:
-                print(f"Patient {patient} : Données introuvables ou incorrectes.")
+                # TODO: select specific patients
+                print(f"Selection spécificque de patient n'est pas encore possible.")
 
-        else:
-            # TODO: select specific patients
-            print(f"Selection spécificque de patient n'est pas encore possible.")
-
-            # if patient_local_path:
-            #     upload_preprocessed_to_gcp(patient_local_path, bucket_name, preprocessed_path, patient)
+                # if patient_local_path:
+                #     upload_preprocessed_to_gcp(patient_local_path, bucket_name, preprocessed_path, patient)
 
 
-    elif "local":
-        print("uploading patient data from local...")
-        print("failed") # TODO: logic
-        return
+        elif "local":
+            print("uploading patient data from local...")
+            print("failed") # TODO: logic
+            return
+
+    except Exception as e:
+        print(f"Couldn't preprocess data correctly due to error: {e}")
 
     return
 
@@ -268,13 +272,15 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input
     psds = []
 
     if not mode in ["channels", "time"]:
-        print("get_psds: unrecognised mode.")
+        print('get_psds: unrecognised mode.')
         return None
 
     if input_type == 'list':
+
         for eeg in EEG_list:
             f, temp_psd = welch(eeg, fs=fs, nperseg=1024)
             psds.append(temp_psd)
+
         psds_df = pd.DataFrame(psds)
 
 
@@ -287,8 +293,8 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input
         elif mode == 'channels':
             return f, psds_df
 
-
     if input_type == 'array':
+        psds = []
         for i in range(0, EEG_list.shape[0]):
             psds1 = []
             for j in range(0, EEG_list.shape[2]):
@@ -297,6 +303,7 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input
             psds.append(psds1)
         psds_ar = np.array(psds)
         psds_ar = np.transpose(psds_ar, axes=(0,2,1))
+
         if mode == 'time':
             psds_df = pd.DataFrame(psds_ar)
             if hours.shape[0] == psds_ar.shape[1]:
@@ -304,6 +311,7 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input
                 psds_df = psds_df.groupby(by='hours',as_index=True).mean()
                 return f, psds_df
             return f, psds_df
+
         elif mode == 'channels':
             return f, psds_ar
 
@@ -366,7 +374,7 @@ def remove_artifacts(eeg_epoch: np.array, threshold=100):
 
     # slow-drift
 
-    return (np.max(np.abs(eeg_epoch)) > threshold)
+    return (np.max(np.abs(eeg_epoch)) > threshold) # indicate if EEG signal amplitude (mV) is higher than threshold
 
 
 if "__main__" == __name__:

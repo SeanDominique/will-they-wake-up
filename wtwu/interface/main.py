@@ -18,7 +18,6 @@ def preproc(patients: list):
 def train(input_shape, model, ):
     # model
     # create_model()
-
     pass
 
 
