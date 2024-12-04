@@ -82,23 +82,24 @@ def preprocess(patients=[]):
 
 
                 # standardize (z-score normalization)
-                    # std = np.std(list_of_epochs, axis=0)
-                    # mean = np.mean(list_of_epochs, axis=0)
-                    # std = np.where(std == 0, 1, std)
-                    # list_of_epochs = (list_of_epochs - mean) / std
                 standardized_eeg_epochs = standardize(eeg_epochs)
 
                  # calcul des PSD
                     # for feature engineering or other models
-
+                psd_list = []
+                f_list = []
+                for eeg in standardized_eeg_epochs:
+                    f, psd = get_psds(eeg)
+                    psd_list.append(psd)
+                    f_list.append(f)
 
                 ### Preprocessing patient data DONE
                 print("Data preprocessing done for patient: {patient}")
 
                 # upload patient info to relevant GCS bucket
                 patient_info = {
-                    # "PSDs.npy": list_of_psds,
-                    # "PSDs_fs.npy": psds_fs,
+                    "PSDs.npy": psd_list,
+                    "PSDs_fs.npy": f_list,
                     "time_splits.npy": standardized_eeg_epochs,
                     "times.npy": split_times,
                     "header.pkl": eeg_data_headers
@@ -263,25 +264,31 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input
     all PSDs as columns and their 'hours after cardiac arrest' as index.
     input_type = ['list' ,'array']
     '''
+
+    psds = []
+
+    if not mode in ["channels", "time"]:
+        print("get_psds: unrecognised mode.")
+        return None
+
     if input_type == 'list':
-        psds = []
         for eeg in EEG_list:
             f, temp_psd = welch(eeg, fs=fs, nperseg=1024)
             psds.append(temp_psd)
         psds_df = pd.DataFrame(psds)
-        if mode == 'time' and hours.shape[1] == psds_ar.shape[1]:
-            psds_df = pd.concat([psds_df, hours], axis=1)
-            psds_df = psds_df.groupby(by='hours',as_index=True).mean()
+
+
+        if mode == 'time':
+            if hours.shape[1] == psds_ar.shape[1]:
+                psds_df = pd.concat([psds_df, hours], axis=1)
+                psds_df = psds_df.groupby(by='hours',as_index=True).mean()
             return f, psds_df
-        elif mode == 'time':
-            return f, psds_df
+
         elif mode == 'channels':
             return f, psds_df
-        else:
-            print('get_psds: unrecognised mode.')
-            return None
+
+
     if input_type == 'array':
-        psds = []
         for i in range(0, EEG_list.shape[0]):
             psds1 = []
             for j in range(0, EEG_list.shape[2]):
@@ -299,9 +306,7 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input
             return f, psds_df
         elif mode == 'channels':
             return f, psds_ar
-        else:
-            print('get_psds: unrecognised mode.')
-            return None
+
     else:
         print('get_psds: bad input type')
         return None
