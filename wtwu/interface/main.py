@@ -34,7 +34,6 @@ if __name__ == "__main__":
     # check latest processed patient data
     try:
         client = storage.Client()
-        print("check 0")
         blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_PROCESSED_DATA_PATH}")
 
         blob_names = set()
@@ -46,12 +45,14 @@ if __name__ == "__main__":
         blob_names = sorted(blob_names)
         print(blob_names)
         last_processed_patient_id = blob_names[-1]
+        print("last_processed_patient_id:", last_processed_patient_id)
 
         # continue preprocessing from where it left off
         with open("patient_ids.txt", "r") as f:
             lines = f.readlines()
             for line in lines:
                 patient_id = line.split("/")[-2]
+                print(patient_id)
 
                 if int(patient_id) > int(last_processed_patient_id):
                     patients.append(patient_id)
