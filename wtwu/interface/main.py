@@ -34,28 +34,32 @@ if __name__ == "__main__":
     # check latest processed patient data
     try:
         client = storage.Client()
-        blobs = client.list_blobs({BUCKET_NAME}, prefix={PATIENT_PROCESSED_DATA_PATH}, delimiter="/")
+        print("check 0")
+        blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_PROCESSED_DATA_PATH}")
 
         blob_names = set()
+
         for blob in blobs:
-            blob_names.add(blob.name)
+            patient_id = blob.name.split("/")[-2]
+            blob_names.add(patient_id)
 
         blob_names = sorted(blob_names)
+        print(blob_names)
         last_processed_patient_id = blob_names[-1]
 
+        # continue preprocessing from where it left off
+        with open("patient_ids.txt", "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                patient_id = line.split("/")[-2]
 
-    except:
-        print("error finding preprocessed patients in GCS bucket")
+                if int(patient_id) > int(last_processed_patient_id):
+                    patients.append(patient_id)
 
-    # continue preprocessing from where it left off
-    with open("patient_ids.txt", "r") as f:
-        lines = f.readlines()
-        for line in lines:
-            patient_id = line.split("/")[-2]
 
-            if int(patient_id) > int(last_processed_patient_id):
-                patients.append(patient_id)
+    except Exception as e:
+        print(f"error finding preprocessed patients in GCS bucket : {e}")
 
-    print(patients)
+    print("patient to preprocess : \n", patients)
 
-    # preprocess(patients)
+    preprocess(patients)
