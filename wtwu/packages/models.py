@@ -105,7 +105,7 @@ def train_model(model, X_train, y_train, X_val, y_val, save_path="./models/best_
     # Entraîner le modèle
     history = model.fit(
         X_train, y_train,
-        validation_data=(X_val, y_val),
+        validation_split=0.2,
         epochs=epochs,
         shuffle=True,
         batch_size=min(128, len(y_train) // 10),  # Ajuster selon la taille des données

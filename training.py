@@ -15,7 +15,7 @@ if __name__ == "__main__":
     bucket_name = params.BUCKET_NAME
     prefix = "preprocessed"
     batch_size = 32
-    patients = [str(i) for i in range(284, 900)]  # Liste des patients (à ajuster selon vos données)
+    patients = [str(i) for i in range(284, 1100)]  # Liste des patients (à ajuster selon vos données)
 
 
     print("Current working directory:", os.getcwd())
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Étape 4 : Diviser les données en Entraînement, Validation, et Test
     print("Division des données en Entraînement, Validation, et Test...")
-    X_train, y_train = np.concatenate(X_batches[:-2]), np.concatenate(y_batches[:-2])
+    X_train, y_train = np.concatenate(X_batches[:-1]), np.concatenate(y_batches[:-1])
     X_val, y_val = X_batches[-2], y_batches[-2]
     X_test, y_test = X_batches[-1], y_batches[-1]
 
