@@ -1,6 +1,6 @@
 from wtwu.packages.storage import *
 from wtwu.packages.preprocess import preprocess
-from wtwu.packages.model import *
+from wtwu.packages.models import *
 
 import numpy as np
 from google.cloud import storage
@@ -17,11 +17,15 @@ def preproc(patients: list):
 
 def train(input_shape, model, ):
     # model
-    create_model()
-
+    # create_model()
     pass
 
 
 def pred():
     # give the address to the new data OR the new data
     pass
+
+
+if __name__ == "__main__":
+    patients = []
+    preprocess(patients)

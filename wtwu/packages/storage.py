@@ -32,16 +32,25 @@ def get_list_of_patients():
     """
     Récupère la liste des patients à partir des blobs présents dans le bucket Google Storage.
     """
+    print("getting list of patient IDs")
 
     client = storage.Client()
-    blobs = client.list_blobs(BUCKET_NAME, prefix=f"{PATIENT_DATA_PATH}", delimiter='/')
+
+    if not os.path.exists("patient_ids.txt"):
+        with open("patient_ids.txt", 'wb') as f:
+            print("File not found locally....creating")
+            client.download_blob_to_file(f"gs://{BUCKET_NAME}/{PATIENT_DATA_PATH}RECORDS", f)
+            print(f"New file with patient IDs created: {f.name}")
+
+    patient_ids = set()
 
     # Extraire les ID des patients
-    patient_ids = set()
-    for blob in blobs:
-        path_parts = blob.name.split("/")
-        if len(path_parts) > 2 and path_parts[-2].isnumeric():
-            patient_ids.add(path_parts[-2])
+    with open ("patient_ids.txt", "r") as f:
+        l = f.readlines()
+        for line in l:
+            path_parts = line.split("/")
+            if path_parts[1].isnumeric():
+                patient_ids.add(path_parts[1])
 
     return sorted(list(patient_ids))
 
@@ -149,16 +158,19 @@ def extract_header_data(header_file_content, file_name):
 
     Returns:
         dict{
-            "fs": # sampling frequency
-            "num_channels": # number of total channels from recording
-            "num_samples": # total number of samples in that .mat file
-            "recording_hour": the hour the recording was made after ROSC (Return Of Spontaneous Circulation)
-            "channels_index": {}, # dictionary with the indexes of each channel in the `eeg_data` numpy array
+            "fs":                       # sampling frequency
+            "utility_freq":             # utility frequency of the hospital
+            "num_channels":             # number of total channels from recording
+            "num_samples":              # total number of samples in that .mat file
+            "recording_hour":           # the hour the recording was made after ROSC (Return Of Spontaneous Circulation)
+            "channels_index": {},       # dictionary with the indexes of each channel in the `eeg_data` numpy array
             "all_channels_found": False # True if the data contains values for all the channels in `CHANNELS`
         }
     """
+
     hea_result = {
         "fs": 0,
+        "utility_freq": 0,
         "num_channels": 0,
         "num_samples": 0,
         "recording_hour": 0,
@@ -179,6 +191,7 @@ def extract_header_data(header_file_content, file_name):
         hea_result["fs"] = int(first_line[2])
         hea_result["num_channels"] = int(first_line[1])
         hea_result["num_samples"] = int(first_line[3])
+        hea_result["utility_freq"] = lines[-3][-3:-1]
 
         # check which channels were recorded in the patient's dataset
         for channel in CHANNELS:
@@ -297,7 +310,7 @@ def save_predictions_to_bigquery(project_id, dataset_id, table_id, predictions):
 
 
 if __name__ == "__main__":
-    survived, eeg_data_headers, all_eeg_data = import_data("0430")
+    survived, eeg_data_headers, all_eeg_data = import_data("0484")
     print(survived)
     print(eeg_data_headers)
     print(all_eeg_data)
