@@ -1,0 +1,68 @@
+[
+    {
+        "epoch": 1,
+        "batch_size": 47680,
+        "training_loss": 0.6734992861747742,
+        "validation_loss": 0.5812376141548157,
+        "training_accuracy": 0.5921980142593384,
+        "validation_accuracy": 0.71875,
+        "training recall": 0.06995714455842972,
+        "validation recall": 0.0,
+        "model_path": "./Metrics_wtwa/model_12_2024-12-04_24_to_48_hours.h5"
+    },
+    {
+        "epoch": 2,
+        "batch_size": 47680,
+        "training_loss": 0.661815881729126,
+        "validation_loss": 0.5755497217178345,
+        "training_accuracy": 0.6098783612251282,
+        "validation_accuracy": 0.8125,
+        "training recall": 0.18658681213855743,
+        "validation recall": 0.0,
+        "model_path": "./Metrics_wtwa/model_12_2024-12-04_24_to_48_hours.h5"
+    },
+    {
+        "epoch": 3,
+        "batch_size": 47680,
+        "training_loss": 0.651787281036377,
+        "validation_loss": 0.49626296758651733,
+        "training_accuracy": 0.6242659687995911,
+        "validation_accuracy": 0.84375,
+        "training recall": 0.26036450266838074,
+        "validation recall": 0.0,
+        "model_path": "./Metrics_wtwa/model_12_2024-12-04_24_to_48_hours.h5"
+    },
+    {
+        "epoch": 4,
+        "batch_size": 47680,
+        "training_loss": 0.649189829826355,
+        "validation_loss": 0.5991672873497009,
+        "training_accuracy": 0.6255243420600891,
+        "validation_accuracy": 0.8125,
+        "training recall": 0.2349114567041397,
+        "validation recall": 0.0,
+        "model_path": "./Metrics_wtwa/model_12_2024-12-04_24_to_48_hours.h5"
+    },
+    {
+        "epoch": 5,
+        "batch_size": 47680,
+        "training_loss": 0.6354637145996094,
+        "validation_loss": 0.5050390362739563,
+        "training_accuracy": 0.6442952752113342,
+        "validation_accuracy": 0.78125,
+        "training recall": 0.3282564878463745,
+        "validation recall": 0.0,
+        "model_path": "./Metrics_wtwa/model_12_2024-12-04_24_to_48_hours.h5"
+    },
+    {
+        "epoch": 6,
+        "batch_size": 47680,
+        "training_loss": 0.6482288837432861,
+        "validation_loss": 0.5387964844703674,
+        "training_accuracy": 0.6336199641227722,
+        "validation_accuracy": 0.96875,
+        "training recall": 0.23258815705776215,
+        "validation recall": 0.0,
+        "model_path": "./Metrics_wtwa/model_12_2024-12-04_24_to_48_hours.h5"
+    }
+]

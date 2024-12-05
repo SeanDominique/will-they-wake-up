@@ -15,7 +15,7 @@ if __name__ == "__main__":
     bucket_name = params.BUCKET_NAME
     prefix = "preprocessed"
     batch_size = 32
-    patients = [str(i) for i in range(284, 702)]  # Liste des patients (à ajuster selon vos données)
+    patients = [str(i) for i in range(284, 900)]  # Liste des patients (à ajuster selon vos données)
 
 
     print("Current working directory:", os.getcwd())
@@ -73,7 +73,8 @@ if __name__ == "__main__":
             "validation_loss": history.history['val_loss'][epoch],
             "training_accuracy": history.history['accuracy'][epoch],
             "validation_accuracy": history.history['val_accuracy'][epoch],
-            "recall":history.history['recall'][epoch],
+            "training recall":history.history['recall'][epoch],
+            "validation recall":history.history['val_recall'][epoch],
             "model_path": model_path
         }
         for epoch in range(len(history.history['loss']))

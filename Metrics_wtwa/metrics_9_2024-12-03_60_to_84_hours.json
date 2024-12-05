@@ -1,0 +1,62 @@
+[
+    {
+        "epoch": 1,
+        "batch_size": 14976,
+        "training_loss": 0.6817106008529663,
+        "validation_loss": 0.6687386631965637,
+        "training_accuracy": 0.5713140964508057,
+        "validation_accuracy": 0.8125,
+        "recall": 0.17757724225521088,
+        "model_path": "./Metrics_wtwa/model_9_2024-12-03_60_to_84_hours.h5"
+    },
+    {
+        "epoch": 2,
+        "batch_size": 14976,
+        "training_loss": 0.6619600653648376,
+        "validation_loss": 0.5626542568206787,
+        "training_accuracy": 0.595886766910553,
+        "validation_accuracy": 0.8125,
+        "recall": 0.3227286636829376,
+        "model_path": "./Metrics_wtwa/model_9_2024-12-03_60_to_84_hours.h5"
+    },
+    {
+        "epoch": 3,
+        "batch_size": 14976,
+        "training_loss": 0.6392942070960999,
+        "validation_loss": 0.47267821431159973,
+        "training_accuracy": 0.621995210647583,
+        "validation_accuracy": 0.8125,
+        "recall": 0.4562557339668274,
+        "model_path": "./Metrics_wtwa/model_9_2024-12-03_60_to_84_hours.h5"
+    },
+    {
+        "epoch": 4,
+        "batch_size": 14976,
+        "training_loss": 0.620092511177063,
+        "validation_loss": 0.6362295150756836,
+        "training_accuracy": 0.646300733089447,
+        "validation_accuracy": 0.78125,
+        "recall": 0.5188130736351013,
+        "model_path": "./Metrics_wtwa/model_9_2024-12-03_60_to_84_hours.h5"
+    },
+    {
+        "epoch": 5,
+        "batch_size": 14976,
+        "training_loss": 0.5992716550827026,
+        "validation_loss": 0.48125195503234863,
+        "training_accuracy": 0.6657318472862244,
+        "validation_accuracy": 0.8125,
+        "recall": 0.5607219338417053,
+        "model_path": "./Metrics_wtwa/model_9_2024-12-03_60_to_84_hours.h5"
+    },
+    {
+        "epoch": 6,
+        "batch_size": 14976,
+        "training_loss": 0.5947079062461853,
+        "validation_loss": 0.5870220065116882,
+        "training_accuracy": 0.6698718070983887,
+        "validation_accuracy": 0.75,
+        "recall": 0.556745171546936,
+        "model_path": "./Metrics_wtwa/model_9_2024-12-03_60_to_84_hours.h5"
+    }
+]

@@ -1,0 +1,82 @@
+[
+    {
+        "epoch": 1,
+        "batch_size": 20224,
+        "training_loss": 0.6855653524398804,
+        "validation_loss": 0.6616886854171753,
+        "training_accuracy": 0.555874228477478,
+        "validation_accuracy": 0.8125,
+        "recall": 0.29509249329566956,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    },
+    {
+        "epoch": 2,
+        "batch_size": 20224,
+        "training_loss": 0.6683316826820374,
+        "validation_loss": 0.5708283185958862,
+        "training_accuracy": 0.588063657283783,
+        "validation_accuracy": 0.78125,
+        "recall": 0.4554688334465027,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    },
+    {
+        "epoch": 3,
+        "batch_size": 20224,
+        "training_loss": 0.6486395597457886,
+        "validation_loss": 0.5539385676383972,
+        "training_accuracy": 0.6197092533111572,
+        "validation_accuracy": 0.65625,
+        "recall": 0.5354431867599487,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    },
+    {
+        "epoch": 4,
+        "batch_size": 20224,
+        "training_loss": 0.6360646486282349,
+        "validation_loss": 0.4117702841758728,
+        "training_accuracy": 0.6331091523170471,
+        "validation_accuracy": 0.8125,
+        "recall": 0.575109601020813,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    },
+    {
+        "epoch": 5,
+        "batch_size": 20224,
+        "training_loss": 0.6182610988616943,
+        "validation_loss": 0.3822842836380005,
+        "training_accuracy": 0.6527393460273743,
+        "validation_accuracy": 0.84375,
+        "recall": 0.604832649230957,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    },
+    {
+        "epoch": 6,
+        "batch_size": 20224,
+        "training_loss": 0.617573618888855,
+        "validation_loss": 0.5248644948005676,
+        "training_accuracy": 0.6611946225166321,
+        "validation_accuracy": 0.65625,
+        "recall": 0.5895434617996216,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    },
+    {
+        "epoch": 7,
+        "batch_size": 20224,
+        "training_loss": 0.6050769090652466,
+        "validation_loss": 0.4349493980407715,
+        "training_accuracy": 0.6706388592720032,
+        "validation_accuracy": 0.84375,
+        "recall": 0.5836629867553711,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    },
+    {
+        "epoch": 8,
+        "batch_size": 20224,
+        "training_loss": 0.5890519618988037,
+        "validation_loss": 0.4302850365638733,
+        "training_accuracy": 0.68359375,
+        "validation_accuracy": 0.8125,
+        "recall": 0.6185181140899658,
+        "model_path": "./Metrics_wtwa/model_8_2024-12-03_48_to_72_hours.h5"
+    }
+]
