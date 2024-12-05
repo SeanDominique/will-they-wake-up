@@ -21,6 +21,8 @@ import numpy as np
 import pandas as pd
 import io
 from google.cloud import bigquery
+import datetime
+
 # # to automate with model lifecycle
 # import mlflow
 # import pickle
@@ -295,6 +297,37 @@ def save_predictions_to_bigquery(project_id, dataset_id, table_id, predictions):
         print("Prédictions sauvegardées dans BigQuery.")
 
 
+def save_best_hps_to_bigquery(project_id, dataset_id, table_id, best_hps, metrics):
+    """
+    Sauvegarde les meilleurs hyperparamètres et métriques dans BigQuery.
+
+    Args:
+        project_id (str): ID du projet GCP.
+        dataset_id (str): Nom du dataset BigQuery.
+        table_id (str): Nom de la table BigQuery.
+        best_hps (dict): Meilleurs hyperparamètres.
+        metrics (dict): Métriques associées au meilleur modèle.
+    """
+    client = bigquery.Client(project=project_id)
+    table_ref = f"{project_id}.{dataset_id}.{table_id}"
+
+    # Préparer les données à insérer
+    row = {
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "hyperparameters": str(best_hps.values),
+        "best_val_accuracy": metrics['recall','accuracy'],
+        "best_val_loss": metrics['loss']
+    }
+
+    # Insérer les données dans BigQuery
+    try:
+        errors = client.insert_rows_json(table_ref, [row])
+        if errors:
+            print(f"Erreur lors de l'insertion des hyperparamètres : {errors}")
+        else:
+            print(f"Hyperparamètres insérés avec succès dans la table {table_ref}.")
+    except Exception as e:
+        print(f"Erreur d'insertion dans BigQuery : {e}")
 
 if __name__ == "__main__":
     survived, eeg_data_headers, all_eeg_data = import_data("0430")

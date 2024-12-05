@@ -6,6 +6,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from datetime import datetime
 import tensorflow.keras.backend as K
+from tensorflow.keras.regularizers import l2
+from keras_tuner.tuners import RandomSearch
 
 
 import matplotlib.pyplot as plt
@@ -25,7 +27,86 @@ def false_positive_ratio(y_true,y_pred):
     false_positives = K.sum(K.round(K.clip((1 - y_true) * y_pred, 0, 1)))
     return false_positives / (false_positives + true_negatives)
 
+def build_model(hp):
+    """
+    Crée un modèle Keras avec des hyperparamètres ajustables pour Grid Search.
 
+    Args:
+        hp (kerastuner.HyperParameters): Objet pour définir les hyperparamètres.
+
+    Returns:
+        tf.keras.Model: Modèle compilé.
+    """
+    model = Sequential([
+        # Couche Bidirectionnelle LSTM
+        Bidirectional(LSTM(
+            units=hp.Int('lstm_units', min_value=64, max_value=256, step=64),
+            return_sequences=True,
+            kernel_regularizer=l2(hp.Float('l2_reg', min_value=0.001, max_value=0.01, step=0.002))
+        ), input_shape=(1500, 8)),
+        Dropout(hp.Float('dropout_rate', min_value=0.2, max_value=0.5, step=0.1)),
+
+        # Couche LSTM supplémentaire
+        LSTM(
+            units=hp.Int('lstm_units_2', min_value=32, max_value=128, step=32),
+            return_sequences=False,
+            kernel_regularizer=l2(hp.Float('l2_reg_2', min_value=0.001, max_value=0.01, step=0.002))
+        ),
+        Dropout(hp.Float('dropout_rate_2', min_value=0.2, max_value=0.5, step=0.1)),
+
+        # Couche Dense
+        Dense(
+            units=hp.Int('dense_units', min_value=32, max_value=128, step=32),
+            activation='relu',
+            kernel_regularizer=l2(hp.Float('l2_reg_dense', min_value=0.001, max_value=0.01, step=0.002))
+        ),
+
+        # Couche de sortie
+        Dense(1, activation='sigmoid')
+    ])
+
+    model.compile(
+        optimizer=hp.Choice('optimizer', values=['adam', 'rmsprop']),
+        loss='binary_crossentropy',
+        metrics=['accuracy', 'recall']
+    )
+    return model
+
+def optimize_model(X_train, y_train, X_val, y_val, max_trials=10, executions_per_trial=1):
+    """
+    Optimise les hyperparamètres du modèle avec KerasTuner et Grid Search.
+
+    Args:
+        X_train (np.array): Données d'entraînement.
+        y_train (np.array): Labels d'entraînement.
+        X_val (np.array): Données de validation.
+        y_val (np.array): Labels de validation.
+        max_trials (int): Nombre de combinaisons d'hyperparamètres à tester.
+        executions_per_trial (int): Nombre d'exécutions pour chaque essai.
+
+    Returns:
+        tf.keras.Model: Meilleur modèle trouvé.
+        dict: Meilleurs hyperparamètres.
+    """
+    tuner = RandomSearch(
+        build_model,
+        objective=['val_recall','val_accuracy'],
+        max_trials=max_trials,
+        executions_per_trial=executions_per_trial,
+        directory='hyperparameter_tuning',
+        project_name='rnn_grid_search'
+    )
+
+    print("Lancement de la recherche d'hyperparamètres...")
+    tuner.search(X_train, y_train, validation_data=(X_val, y_val), epochs=2, batch_size=32)
+
+    # Obtenir les meilleurs hyperparamètres
+    best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
+    print(f"Meilleurs hyperparamètres trouvés : {best_hps.values}")
+
+    # Construire le meilleur modèle
+    best_model = tuner.hypermodel.build(best_hps)
+    return best_model, best_hps
 
 def create_model(input_shape):
     """
@@ -47,7 +128,7 @@ def create_model(input_shape):
     model.compile(
         optimizer='adam',
         loss='binary_crossentropy',
-        metrics=['accuracy','recall']
+        metrics=['accuracy','recall','precision']
     )
 
     return model
@@ -65,6 +146,9 @@ def create_model2(input_shape):
     model2 = Sequential()
     #Crée un modèle RNN avec des couches LSTM pour traiter les données temporelles.
     # Première couche LSTM
+    model2.add(Bidirectional(LSTM(128, return_sequences=False), input_shape=(1500, 8)))
+    model2.Dropout((0.3))
+    #deuxieme couche  LSTM
     model2.add(LSTM(64, activation='tanh', return_sequences=True, input_shape=input_shape))
     model2.add(Dropout(0.3))  # Régularisation
 
@@ -73,14 +157,14 @@ def create_model2(input_shape):
     model2.add(Dropout(0.3))
 
     #Troisieme couche LSTM
-    model2.add(Bidirectional(LSTM(64, return_sequences=False), input_shape=(1500, 8)))
+
     # Couche Dense pour la sortie
     model2.add(Dense(1, activation='sigmoid'))  # Sortie binaire (0 ou 1)
 
     model2.compile(
         optimizer='adam',
         loss='binary_crossentropy',
-        metrics=['accuracy']
+        metrics=['accuracy', 'recall']
     )
 
     return model2
@@ -204,3 +288,35 @@ def save_metrics_local(metrics, base_dir="./Metrics_wtwa", time_window=None, win
 
         print(f"Métriques sauvegardées localement dans {save_path}")
         return save_path
+
+def save_best_hps_local_hyperparameters(directory, best_hps, metrics):
+    """
+    Sauvegarde les meilleurs hyperparamètres et métriques localement dans un dossier dédié.
+
+    Args:
+        directory (str): Dossier parent où créer le dossier "Hyperparametres".
+        best_hps (dict): Meilleurs hyperparamètres trouvés.
+        metrics (dict): Métriques associées au meilleur modèle.
+    """
+    # Créer le dossier principal et le sous-dossier "Hyperparametres"
+    hyperparam_dir = os.path.join(directory, "Hyperparametres")
+    os.makedirs(hyperparam_dir, exist_ok=True)
+
+    # Préparer les données
+    data = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "hyperparameters": best_hps.values, # Extraction des hyperparamètres
+        "best_val_accuracy": metrics['accuracy'],
+        "best_val_recall": metrics['recall'],
+        "best_val_loss": metrics['loss']
+    }
+
+    # Nom du fichier avec timestamp
+    filename = os.path.join(hyperparam_dir, f"best_hps_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json")
+
+    # Sauvegarder les données dans un fichier JSON
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+    print(f"Meilleurs hyperparamètres et métriques sauvegardés localement dans : {filename}")
+    return filename
