@@ -1,6 +1,6 @@
 from wtwu.packages.storage import *
 from wtwu.packages.preprocess import preprocess
-from wtwu.packages.model import *
+from wtwu.packages.models import *
 
 import numpy as np
 from google.cloud import storage

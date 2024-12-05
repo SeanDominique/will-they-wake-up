@@ -28,46 +28,55 @@ def preprocess(patients=[]):
 
                 # Import des données
                 survived, eeg_data_headers, all_eeg_data = import_data(patient)
+                print("all_eeg_data shape: ", all_eeg_data.shape)
 
                 if eeg_data_headers != "Error" and len(eeg_data_headers) > 0:
 
                     fs = eeg_data_headers[0]['fs']
                     hours = np.array([header['recording_hour'] for header in eeg_data_headers]).astype(np.float16)
 
-
                     # Réduction des données
                         # TODO: try undersampling of 125Hz and 128Hz (in research paper)
-                    undersampled_eeg_data = undersample_eegs(all_eeg_data, target_freq=100, original_freq=fs)
-
+                    print("undersampling")
+                    undersampled_eeg_data = undersample_eegs(all_eeg_data, new_freq=100, original_freq=fs)
+                    print("underdsampled_eeg_data shape: ", undersampled_eeg_data.shape)
 
                     # Re-reference (mean, local, outter electrode...)
 
 
                     # Bandpass filter (0.1-40Hz)
                     # `filter_data`` default uses FIR method which is more computationally intensive, but more stable. Using this over butterworth filter, an IIR method, because we are more focused on temporal analysis where phase distortion could be a problem.
+                    print("bandpass filter")
                     bandpassed_eeg_data = filter_data(undersampled_eeg_data,
                                                     sfreq=fs,
                                                     l_freq=0.01,
                                                     h_freq=40)
-
+                    print("bandpass filtered shape: ", bandpassed_eeg_data.shape)
 
                     # Notch filter
-                    utility_freq = eeg_data_headers[0]['Utility frequency'] # TODO: collect EEG recording location from eeg_header
-                    notched_eeg_data = notch_filter(bandpassed_eeg_data, fs, np.arange(utility_freq,
-                                                                                    5*utility_freq+1,
-                                                                                    utility_freq))
+                        # TODO: Need to check if literature suggests to apply notch filter even if undersampling AND applying bandpass filter to < utility freq (my assumption is no because it was removed during the bandpass, although depending on the order of the butterworth filter "residue" frequency could be present)
+                    # utility_freq = round(int(eeg_data_headers[0]['utility_freq']))
+                    # if utility_freq == 50:
+                    #     print("notch filter")
+                    #     notched_eeg_data = notch_filter(bandpassed_eeg_data,
+                    #                                     Fs=100,
+                    #                                     freqs=utility_freq
+                    #                                     )
 
                     # Artifacts: removal and imputation [advanced]
 
 
                     # ICA
 
+
                     # Epoching
                     # # Fenêtrage et normalisation
-                    eeg_epochs, split_times = epoch_eeg(notched_eeg_data, hours=hours)
+                    print("epoching")
+                    eeg_epochs, split_times = epoch_eeg(bandpassed_eeg_data, hours=hours)
 
 
                     # Artifacts: Remove epochs with artefacts [simplistic]\
+                    print("artefact removal")
                     indeces = []
                     for i, epoch in enumerate(eeg_epochs):
                         if remove_artifacts(epoch):
@@ -83,16 +92,14 @@ def preprocess(patients=[]):
 
 
                     # standardize (z-score normalization)
+                    print("normalize")
                     standardized_eeg_epochs = standardize(eeg_epochs)
+                    print("standardized_eeg shape", standardized_eeg_epochs.shape)
 
                     # calcul des PSD
                         # for feature engineering or other models
-                    psds_list = []
-                    f_list = []
-                    for eeg in standardized_eeg_epochs:
-                        f, psd = get_psds(eeg)
-                        f_list.append(f)
-                        psds_list.append(psd)
+                    print("creating PSDs")
+                    f_list, psds_list = get_psds(standardized_eeg_epochs)
 
                     ### Preprocessing patient data DONE
                     print("Data preprocessing done for patient: {patient}")
@@ -160,9 +167,21 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq, max_seconds=15):
         undersampled_eeg_data (np.ndarray): Resampled TS
     """
 
+
+    # convert to dtype that mne.resample() can handle
+    converted_eeg = raw_eeg.astype(np.float64)
+
     resampling_ratio = original_freq / new_freq
 
-    undersampled_eeg_data = resample(raw_eeg, down=resampling_ratio) # uses anti-aliasing
+    # uses anti-aliasing,
+    # the lower frequencies we are interested in [0.1 - 40]Hz are safe
+    # because the Nyquist frequency is new_freq/2 = 50 Hz.
+    # Therefore the low pass filter used to avoid aliasing won't cut out the frequencies of interest.
+    # note: the Nyquist frequency is dependent on the new frequency -> this is because undersampling implies
+    #       you are using a lower frequency to capture the same signal, so higher frequency components will be lost
+    undersampled_eeg_data = resample(converted_eeg, down=resampling_ratio)
+
+
 
     # in case resampled array is too large
     max_samples = max_seconds * new_freq
@@ -171,7 +190,7 @@ def resample_eeg_data(raw_eeg, original_freq, new_freq, max_seconds=15):
         undersampled_eeg_data = undersampled_eeg_data[:max_samples]
         print(f'Data points lost: {remaining}')
 
-    print(f'EEG reduced to a {original_freq/resampling_ratio} Hz frequence.')
+    # print(f'EEG reduced to a {original_freq/resampling_ratio} Hz frequence.')
 
     return undersampled_eeg_data
 
@@ -205,17 +224,14 @@ def sampling_EEGs(arr_of_eegs, fs=100, sampling_rate=600, sampling_size=15, hour
     split_time = []
 
     for i_eeg, eeg in enumerate(arr_of_eegs):
-
         i = 0
-        while ((sampling_rate*i) + sampling_size)*fs < len(eeg):
+        while ((sampling_rate*i) + sampling_size) * fs < len(eeg):
             eeg_epochs.append(eeg[(sampling_rate*i)*fs:((sampling_rate*i)+sampling_size)*fs])
 
             # to check if `hours` corresponds to an actual list of hours
             if hours.shape != (10000,):
-                split_time.append(float(hours[i_eeg])+((fs/sampling_rate)*i))
-
-                # 0/6 -> 1/6 -> 2/6, 5/6
-                split_time.append((hours)+((fs/sampling_rate)*i))
+                # 0/6 -> 1/6 -> 2/6 ... -> 5/6
+                split_time.append((hours)+((fs/sampling_rate)*i)) # TODO: Ask Mario about `i_eeg`
             i += 1
 
     eeg_epochs = np.array(eeg_epochs)
@@ -235,9 +251,9 @@ def epoch_eeg(arr_reduced_eeg, fs=100, sampling_rate=600, sampling_size=15,hours
     eeg_epochs = []
     split_times = []
 
+    print(arr_reduced_eeg.shape)
     for i in range(arr_reduced_eeg.shape[0]):
         epochs, split_time = sampling_EEGs(arr_reduced_eeg[i,:,:], hours=hours[i])
-
         eeg_epochs.append(epochs)
 
         # to avoid copying split_time 6 times per EEG 1h recording
@@ -260,17 +276,21 @@ def epoch_eeg(arr_reduced_eeg, fs=100, sampling_rate=600, sampling_size=15,hours
 def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input_type='array'):
     '''
     This function takes an array or list of EEGs and returns the PSDs.
+
     It can have two modes: 'channels' or 'time':
+
     On 'channels' mode, it will return a PSD for each channel
     if given a list of EEGs of a single patient from a single raw file.
+
     On 'time' mode, it will take as input a list containing EEGs of a single
     channel or an average of a single patient and return a dataframe containing
     all PSDs as columns and their 'hours after cardiac arrest' as index.
+
     input_type = ['list' ,'array']
     '''
 
     psds = []
-
+    print("psd-ing")
     if not mode in ["channels", "time"]:
         print('get_psds: unrecognised mode.')
         return None
@@ -293,14 +313,16 @@ def get_psds(EEG_list,fs=100, mode='channels', hours=np.zeros((2,3,4,5,5)),input
         elif mode == 'channels':
             return f, psds_df
 
+
     if input_type == 'array':
-        psds = []
-        for i in range(0, EEG_list.shape[0]):
+        print("EEG_list shape: ", EEG_list.shape)
+        for i in range(EEG_list.shape[0]):
             psds1 = []
-            for j in range(0, EEG_list.shape[2]):
+            for j in range(EEG_list.shape[2]):
                 f, psds_temp = welch(EEG_list[i,:,j], fs=fs, nperseg=4*fs)
                 psds1.append(psds_temp)
             psds.append(psds1)
+
         psds_ar = np.array(psds)
         psds_ar = np.transpose(psds_ar, axes=(0,2,1))
 
@@ -325,7 +347,7 @@ def standardize(eeg_data: np.array, scaler="standard") -> np.array:
     """
     Return a numpy array with the standardized EEG data based on the given scaler
     """
-
+    print("standaaaaardizing")
     match scaler:
         case "standard":
             scale = StandardScaler()
@@ -337,8 +359,14 @@ def standardize(eeg_data: np.array, scaler="standard") -> np.array:
             print("no standardization applied")
             return eeg_data
 
-    eeg_data = scale.fit_transform(eeg_data)
-    return eeg_data
+    scaled_eeg_data = []
+    for epoch in eeg_data:
+        flat_epoch = epoch.flatten()
+        scaled_flattened = scale.fit_transform(flat_epoch.reshape(-1, 1)).flatten()
+        scaled_epoch = scaled_flattened.reshape(epoch.shape)
+        scaled_eeg_data.append(scaled_epoch)
+
+    return np.array(scaled_eeg_data)
 
 
 def impute():
