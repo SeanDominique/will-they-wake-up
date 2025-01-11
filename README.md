@@ -1,23 +1,25 @@
 # will-they-wake-up project (WTWU)
 
-### How the Github repo is organized
+### EEG Predictive Modeling on Comatose Patients
 
-- __notebooks__
-  contains all the notebooks for:
-    - EDA
-    - experimenting with different models and model parameters
-    - performing validation tests
+This repository contains an end-to-end data pipeline and LSTM model for predicting outcomes in over 600 comatose patients based on EEG signals. Our work includes extensive data preprocessing, resampling, and feature engineering, as well as model deployment on Google Cloud Platform (GCP) using virtual machines.
 
-- __WTWU packages__
-  contains all the folders with the modules used throughout the ML lifecycle
+### Overview
+	•	Goal: Predict patient outcomes from EEG data using deep learning (LSTM).
+	•	Data Volume: 1.5TB raw EEG reduced to ~16GB through optimized preprocessing.
+	•	Key Techniques: Resampling, feature extraction and model devlopment inspired from research papers, and reproducible experimentation via modular Python packages.
+	•	Result: Achieved a 34% accuracy rate without incorporating ECG data; potential for improvement by integrating additional physiological signals.
 
-- __setup.py__
-  _for someting???_
-
-- __.env__
-  for environment variables which are not private
-
-- __.gitignore__
-- __.python-version__
-  _for something???_
-- __requirements.txt__
+### Pipeline & Methodology
+	1.	Data Collection: Raw EEG records from 600+ comatose patients - collected from https://moody-challenge.physionet.org/2023/papers/
+	2.	Preprocessing on GCP:
+	•	Utilized Google Cloud virtual machines to handle large-scale data efficiently.
+	•	Converted 1.5TB of raw data to 16GB using downsampling and signal cleaning steps.
+	3.	Feature Engineering:
+	•	Implemented research-backed techniques.
+	4.	LSTM Model:
+	•	Architected and trained an LSTM network to classify outcomes.
+	•	Packaged modules to enable reproducible training, testing, and hyperparameter tuning.
+	5.	Deployment & Orchestration:
+	•	Deployed the model on GCP infrastructure.
+	•	Streamlined workflows using Python packaging and version control best practices.
